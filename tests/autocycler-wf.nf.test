@@ -1,0 +1,13 @@
+nextflow_pipeline {
+    name "test `autocycler-wf` pipeline"
+    script "main.nf"
+    options "-profile test,docker"
+
+    test("basic autocycler-wf run") {
+
+        expect {
+            assert workflow.success
+            // assert workflow.trace.succeeded().size() == 51
+        }
+    }
+}
