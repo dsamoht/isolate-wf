@@ -76,3 +76,54 @@ test2,tests/data/test2_reads_ont_r10.fastq.gz,,
 ## acknowledgement
 The structure of the pipeline tries to follow [__nf-core__](https://pubmed.ncbi.nlm.nih.gov/32055031) best practices :  
 >Ewels PA, Peltzer A, Fillinger S, Patel H, Alneberg J, Wilm A, Garcia MU, Di Tommaso P, Nahnsen S. The nf-core framework for community-curated bioinformatics pipelines. Nat Biotechnol. 2020 Mar;38(3):276-278. doi: 10.1038/s41587-020-0439-x. PubMed PMID: 32055031.
+
+
+```mermaid
+flowchart TB
+  subgraph AUTOCYCLER_WF
+    v3([DISPATCH])
+    v6([LONGREAD_QC])
+    v10([GENOME_SIZE])
+    v14([SUBSAMPLE])
+    v20([ASSEMBLE])
+    v23([APPLY_WEIGHTS])
+    v26([COMPRESS])
+    v29([CLUSTER])
+    v33([TRIM_AND_RESOLVE])
+    v38([COMBINE])
+    subgraph emit
+      v42["nanoplot_raw_html"]
+      v45["qc_long_reads"]
+      v47["versions"]
+      v43["nanoplot_qc_html"]
+      v46["final_assembly"]
+      v44["porechop_log"]
+    end
+    v3 --> v6
+    v6 --> v10
+    v6 --> v14
+    v10 --> v14
+    v10 --> v20
+    v14 --> v20
+    v20 --> v23
+    v23 --> v26
+    v26 --> v29
+    v29 --> v33
+    v33 --> v38
+    v29 --> v38
+    v6 --> v42
+    v6 --> v43
+    v6 --> v44
+    v6 --> v45
+    v38 --> v46
+    v33 --> v47
+    v20 --> v47
+    v6 --> v47
+    v38 --> v47
+    v10 --> v47
+    v26 --> v47
+    v29 --> v47
+    v14 --> v47
+  end
+
+```
