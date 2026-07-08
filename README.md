@@ -8,6 +8,8 @@
 > [!NOTE]
 > Please remember to properly cite Autocycler and the underlying tools it relies on when publishing results generated with this pipeline
 
+> Wick, R. R., Howden, B. P., & Stinear, T. P. (2025). Autocycler: long-read consensus assembly for bacterial genomes. Bioinformatics, 41(9). https://doi.org/10.1093/bioinformatics/btaf474
+
 
 ```
 nextflow wrapper for `Autocycler` genome assembly pipeline
