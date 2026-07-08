@@ -3,7 +3,7 @@
 [![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
 
 
-## Original Autocycler wrapper script by Ryan Wick [available here](https://github.com/rrwick/Autocycler/blob/main/pipelines/Automated_Autocycler_Bash_script_by_Ryan_Wick/autocycler_full.sh)
+## This pipeline is based on Autocycler wrapper script by [Ryan Wick : autocycler_full.sh](https://github.com/rrwick/Autocycler/blob/main/pipelines/Automated_Autocycler_Bash_script_by_Ryan_Wick/autocycler_full.sh)
 
 > [!NOTE]
 > Please remember to properly cite Autocycler and the underlying tools it relies on when publishing results generated with this pipeline
