@@ -1,0 +1,41 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "autocycler_trim_and_resolve"
+description: Trim overlaps and resolve the consensus sequence of one cluster
+keywords:
+  - autocycler
+  - assembly
+  - long reads
+  - consensus
+tools:
+  - "autocycler":
+      description: Consensus long-read assembly of bacterial genomes
+      homepage: https://github.com/rrwick/Autocycler
+      documentation: https://github.com/rrwick/Autocycler/wiki
+      licence: ["GPL-3.0"]
+      identifier: ""
+input:
+  - - meta:
+        type: map
+        description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+    - cluster_dir:
+        type: directory
+        description: Cluster directory from `autocycler cluster`
+output:
+  gfa:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+      - "${cluster_dir.name}/5_final.gfa":
+          type: file
+          description: Resolved cluster graph
+          pattern: "${cluster_dir.name}/5_final.gfa"
+  versions:
+    - "versions.yml":
+        type: file
+        description: File containing software versions
+        pattern: "versions.yml"
+authors:
+  - "@dsamoht"
+maintainers:
+  - "@dsamoht"

@@ -1,0 +1,45 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "autocycler_subsample"
+description: Split long reads into subsets of the depth needed for one assembly each
+keywords:
+  - autocycler
+  - assembly
+  - long reads
+  - consensus
+  - subsample
+tools:
+  - "autocycler":
+      description: Consensus long-read assembly of bacterial genomes
+      homepage: https://github.com/rrwick/Autocycler
+      documentation: https://github.com/rrwick/Autocycler/wiki
+      licence: ["GPL-3.0"]
+      identifier: ""
+input:
+  - - meta:
+        type: map
+        description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+    - reads:
+        type: file
+        description: Long reads in FastQ format
+    - genome_size:
+        type: string
+        description: Estimated genome size in bases
+output:
+  reads:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+      - "subsampled_reads/*.fastq":
+          type: file
+          description: Read subsets, one per assembly
+          pattern: "subsampled_reads/*.fastq"
+  versions:
+    - "versions.yml":
+        type: file
+        description: File containing software versions
+        pattern: "versions.yml"
+authors:
+  - "@dsamoht"
+maintainers:
+  - "@dsamoht"
