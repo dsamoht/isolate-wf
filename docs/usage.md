@@ -25,12 +25,12 @@ test1,tests/data/test1_reads_ont_r10.fastq.gz,,
 test2,tests/data/test2_reads_ont_r10.fastq.gz,,
 ```
 
-| Column          | Description                                                                                  |
-| --------------- | -------------------------------------------------------------------------------------------- |
-| `sample_id`     | Sample identifier, unique across the sample sheet. Spaces are not allowed.                   |
-| `long_reads`    | Gzipped FastQ file of long reads. Required.                                                  |
-| `short_reads_1` | Optional gzipped FastQ file of forward paired-end reads, already QC'd.                       |
-| `short_reads_2` | Optional gzipped FastQ file of reverse paired-end reads. Required if `short_reads_1` is set. |
+| Column          | Description                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------------- |
+| `sample_id`     | Sample identifier, unique across the sample sheet. Spaces are not allowed.                            |
+| `long_reads`    | FastQ file of long reads, gzipped or not. Required.                                                   |
+| `short_reads_1` | Optional FastQ file (gzipped or not) of forward paired-end reads, already QC'd.                       |
+| `short_reads_2` | Optional FastQ file (gzipped or not) of reverse paired-end reads. Required if `short_reads_1` is set. |
 
 The sample sheet is validated against [assets/schema_input.json](../assets/schema_input.json).
 Rules that span several rows are checked before any task is submitted:
