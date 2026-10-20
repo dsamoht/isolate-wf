@@ -1,0 +1,41 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "dnaapler"
+description: Reorient circular contigs to start at dnaA, repA or terL
+keywords:
+  - dnaapler
+  - reorientation
+  - assembly
+  - circular
+tools:
+  - "dnaapler":
+      description: Reorients assembled microbial sequences
+      homepage: https://github.com/gbouras13/dnaapler
+      documentation: https://github.com/gbouras13/dnaapler#usage
+      licence: ["MIT"]
+      identifier: biotools:dnaapler
+input:
+  - - meta:
+        type: map
+        description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+    - assembly:
+        type: file
+        description: Assembly in FASTA format
+output:
+  fasta:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+      - "dnaapler_out/*_reoriented.fasta":
+          type: file
+          description: Reoriented assembly
+          pattern: "dnaapler_out/*_reoriented.fasta"
+  versions:
+    - "versions.yml":
+        type: file
+        description: File containing software versions
+        pattern: "versions.yml"
+authors:
+  - "@dsamoht"
+maintainers:
+  - "@dsamoht"

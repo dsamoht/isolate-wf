@@ -1,0 +1,21 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/environment-schema.json
+channels:
+  - conda-forge
+  - bioconda
+# The assemblers are left unpinned: the docker.io/dsamoht/autocycler image installs the latest
+# Bioconda release of each. Plassembler also needs its database, which only the image ships.
+dependencies:
+  - bioconda::autocycler=0.8.0
+  - bioconda::canu
+  - bioconda::flye
+  - bioconda::metamdbg
+  - bioconda::miniasm
+  - bioconda::minimap2
+  - bioconda::minipolish
+  - bioconda::myloasm
+  - bioconda::necat
+  - bioconda::nextdenovo
+  - bioconda::plassembler
+  - bioconda::racon
+  - bioconda::raven-assembler

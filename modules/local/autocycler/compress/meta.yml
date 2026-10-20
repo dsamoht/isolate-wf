@@ -1,0 +1,41 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "autocycler_compress"
+description: Compress the input assemblies of a sample into a unitig graph
+keywords:
+  - autocycler
+  - assembly
+  - long reads
+  - consensus
+tools:
+  - "autocycler":
+      description: Consensus long-read assembly of bacterial genomes
+      homepage: https://github.com/rrwick/Autocycler
+      documentation: https://github.com/rrwick/Autocycler/wiki
+      licence: ["GPL-3.0"]
+      identifier: ""
+input:
+  - - meta:
+        type: map
+        description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+    - assemblies:
+        type: file
+        description: Assemblies in FASTA format
+output:
+  graph:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+      - "autocycler_out":
+          type: directory
+          description: Autocycler directory holding the input assembly graph
+          pattern: "autocycler_out"
+  versions:
+    - "versions.yml":
+        type: file
+        description: File containing software versions
+        pattern: "versions.yml"
+authors:
+  - "@dsamoht"
+maintainers:
+  - "@dsamoht"

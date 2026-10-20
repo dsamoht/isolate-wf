@@ -1,0 +1,34 @@
+nextflow_pipeline {
+
+    name "Test pipeline"
+    script "../main.nf"
+    tag "pipeline"
+
+    test("-profile test") {
+
+        when {
+            // The read paths of the test sample sheet are relative to the repository, and
+            // nf-test launches Nextflow from a directory of its own: point them at the
+            // repository instead, in a copy of the sample sheet.
+            def samplesheet = new File("${outputDir}/samplesheet_test.csv")
+            samplesheet.parentFile.mkdirs()
+            samplesheet.text = new File("${baseDir}/tests/data/samplesheet_test.csv").text
+                .replaceAll('tests/data/', "${baseDir}/tests/data/")
+
+            params {
+                input  = samplesheet.toString()
+                outdir = "$outputDir"
+            }
+        }
+
+        then {
+            // No snapshot: the assemblers are not reproducible from one run to the next, and
+            // everything Autocycler builds on them - clusters, consensus, CheckM2 scores -
+            // differs in turn.
+            assert workflow.success
+            assert path("$outputDir/sample_test1/autocycler_final/consensus_assembly.fasta").exists()
+            assert path("$outputDir/sample_test2/autocycler_final/consensus_assembly.fasta").exists()
+            assert path("$outputDir/pipeline_info/isolate-wf_software_mqc_versions.yml").exists()
+        }
+    }
+}
