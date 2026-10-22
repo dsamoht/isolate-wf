@@ -8,7 +8,8 @@ process AUTOCYCLER_COMBINE {
     container "docker.io/dsamoht/autocycler:0.8.0"
 
     input:
-    tuple val(meta), path(resolved_gfas), path(autocycler_out)
+    // Every cluster's graph is named 5_final.gfa, so stage each in its own subdirectory
+    tuple val(meta), path(resolved_gfas, stageAs: "cluster_*/5_final.gfa"), path(autocycler_out)
 
     output:
     tuple val(meta), path("consensus_assembly.fasta"), emit: fasta, optional: true
