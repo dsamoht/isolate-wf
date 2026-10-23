@@ -11,8 +11,10 @@ process AUTOCYCLER_TRIM_AND_RESOLVE {
     tuple val(meta), path(cluster_dir)
 
     output:
-    tuple val(meta), path("${cluster_dir.name}/5_final.gfa"), emit: gfa
-    path "versions.yml"                                     , emit: versions
+    // The whole cluster directory, so AUTOCYCLER_COMBINE can rebuild a complete Autocycler
+    // directory (with the 2_trimmed.yaml metrics) around the 5_final.gfa graphs
+    tuple val(meta), path("${cluster_dir.name}"), emit: cluster
+    path "versions.yml"                         , emit: versions
 
     script:
     def args  = task.ext.args ?: ''

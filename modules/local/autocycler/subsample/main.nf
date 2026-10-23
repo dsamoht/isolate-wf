@@ -11,8 +11,10 @@ process AUTOCYCLER_SUBSAMPLE {
     tuple val(meta), path(reads), val(genome_size)
 
     output:
-    tuple val(meta), path("subsampled_reads/*.fastq"), emit: reads
-    path "versions.yml"                              , emit: versions
+    tuple val(meta), path("subsampled_reads/*.fastq")     , emit: reads
+    // Read metrics that `autocycler table` reports, picked up by AUTOCYCLER_COMBINE
+    tuple val(meta), path("subsampled_reads/subsample.yaml"), emit: yaml
+    path "versions.yml"                                   , emit: versions
 
     script:
     def args = task.ext.args ?: ''

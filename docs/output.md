@@ -28,6 +28,7 @@ flowchart TB
   AUTOCYCLER_CLUSTER --> AUTOCYCLER_TRIM_AND_RESOLVE
   AUTOCYCLER_TRIM_AND_RESOLVE --> AUTOCYCLER_COMBINE
   AUTOCYCLER_CLUSTER --> AUTOCYCLER_COMBINE
+  AUTOCYCLER_SUBSAMPLE --> AUTOCYCLER_COMBINE
   AUTOCYCLER_COMBINE --> DNAAPLER
   AUTOCYCLER_COMBINE --> CHECKM2
   LONGREAD_QC --> MULTIQC
@@ -60,6 +61,12 @@ Long reads are trimmed of adapters with Porechop_ABI, then filtered by length
 
 - `sample_<sample_id>/autocycler_final/`
   - `consensus_assembly.fasta`: the Autocycler consensus assembly.
+  - `consensus_assembly.gfa`: the consensus assembly graph, to inspect in [Bandage](https://rrwick.github.io/Bandage/).
+  - `<sample_id>_autocycler_metrics.tsv`: the sample's Autocycler metrics, from `autocycler table`.
+- `sample_<sample_id>/autocycler_clustering/`
+  - `clustering.tsv`, `clustering.newick`, `clustering.yaml`: how the input contigs were clustered.
+  - `qc_pass/`, `qc_fail/`: one directory per cluster, with its untrimmed graph (`1_untrimmed.gfa`).
+- `autocycler_metrics.tsv`: the metrics of every sample in one table.
 
 </details>
 
@@ -68,6 +75,14 @@ every subset is assembled with every assembler not turned off with `--skip_<asse
 a unitig graph, clusters the contigs into putative replicons, trims and resolves each
 cluster that passes QC, and combines them into the consensus. A sample whose assemblers all
 fail, or whose clusters all fail QC, gets no consensus: the run carries on and logs a warning.
+
+The metrics tables help judge how much to trust a consensus: `pass_cluster_count` and
+`fail_cluster_count` count the putative replicons kept and dropped, `overall_clustering_score`
+measures how consistently the assemblies agree on them (1 is best), and
+`consensus_assembly_fully_resolved` tells whether every replicon resolved to one contig. A
+sample whose clusters all fail QC has no metrics line, but its clustering directory is still
+published: [the Autocycler wiki](https://github.com/rrwick/Autocycler/wiki) explains how to read
+it and curate the clusters by hand.
 
 ### Reorientation
 

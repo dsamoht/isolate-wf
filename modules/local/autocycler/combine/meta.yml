@@ -18,21 +18,41 @@ input:
   - - meta:
         type: map
         description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
-    - resolved_gfas:
-        type: file
-        description: Resolved cluster graphs
+    - resolved_clusters:
+        type: directory
+        description: Resolved cluster directories from `autocycler trim` and `autocycler resolve`
     - autocycler_out:
         type: directory
         description: Autocycler directory after clustering
+    - subsample_yaml:
+        type: file
+        description: Read metrics from `autocycler subsample`
+        pattern: "subsample.yaml"
 output:
   fasta:
     - - meta:
           type: map
           description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
-      - "autocycler_out_final/consensus_assembly.fasta":
+      - "consensus_assembly.fasta":
           type: file
           description: Consensus assembly
-          pattern: "autocycler_out_final/consensus_assembly.fasta"
+          pattern: "consensus_assembly.fasta"
+  gfa:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+      - "consensus_assembly.gfa":
+          type: file
+          description: Consensus assembly graph
+          pattern: "consensus_assembly.gfa"
+  metrics:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+      - "*_autocycler_metrics.tsv":
+          type: file
+          description: Header and one line of Autocycler metrics, from `autocycler table`
+          pattern: "*_autocycler_metrics.tsv"
   versions:
     - "versions.yml":
         type: file
