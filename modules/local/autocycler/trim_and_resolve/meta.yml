@@ -22,14 +22,14 @@ input:
         type: directory
         description: Cluster directory from `autocycler cluster`
 output:
-  gfa:
+  cluster:
     - - meta:
           type: map
           description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
-      - "${cluster_dir.name}/5_final.gfa":
-          type: file
-          description: Resolved cluster graph
-          pattern: "${cluster_dir.name}/5_final.gfa"
+      - "${cluster_dir.name}":
+          type: directory
+          description: Trimmed and resolved cluster directory, holding 5_final.gfa and the 2_trimmed.yaml metrics
+          pattern: "cluster_*"
   versions:
     - "versions.yml":
         type: file

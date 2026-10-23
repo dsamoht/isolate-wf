@@ -13,6 +13,8 @@ process AUTOCYCLER_CLUSTER {
     output:
     tuple val(meta), path("autocycler_out_work/clustering/qc_pass/cluster_*"), emit: qc_clusters, optional: true
     tuple val(meta), path("autocycler_out_work")                             , emit: autocycler_out
+    // Emitted for every sample, also when no cluster passes QC, so that case can be inspected
+    tuple val(meta), path("autocycler_out_work/clustering")                  , emit: clustering
     path "versions.yml"                                                      , emit: versions
 
     script:
