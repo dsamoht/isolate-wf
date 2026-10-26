@@ -12,6 +12,7 @@ report and the pipeline information, which are global.
 - [Consensus assembly](#consensus-assembly) — Autocycler
 - [Reorientation](#reorientation) — Dnaapler
 - [Assembly quality](#assembly-quality) — CheckM2
+- [Mobile genetic elements](#mobile-genetic-elements) — geNomad
 - [MultiQC](#multiqc)
 - [Pipeline information](#pipeline-information)
 
@@ -31,6 +32,7 @@ flowchart TB
   AUTOCYCLER_SUBSAMPLE --> AUTOCYCLER_COMBINE
   AUTOCYCLER_COMBINE --> DNAAPLER
   AUTOCYCLER_COMBINE --> CHECKM2
+  AUTOCYCLER_COMBINE --> GENOMAD
   LONGREAD_QC --> MULTIQC
   CHECKM2 --> MULTIQC
 ```
@@ -108,6 +110,22 @@ Skipped with `--skip_dnaapler`.
 </details>
 
 Skipped with `--skip_checkm2`.
+
+### Mobile genetic elements
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `sample_<sample_id>/genomad/<sample_id>_summary/`
+  - `*_plasmid_summary.tsv`, `*_virus_summary.tsv`: the contigs, or regions of contigs, classified as plasmid or virus, with their scores and the marker genes they carry.
+  - `*_plasmid.fna`, `*_virus.fna`: their sequences.
+  - `*_plasmid_genes.tsv`, `*_virus_genes.tsv`: the annotated genes of each plasmid and virus.
+- `sample_<sample_id>/genomad/<sample_id>_find_proviruses/`
+  - `*_provirus.tsv`: proviruses integrated in the chromosome, with their coordinates.
+
+</details>
+
+Skipped with `--skip_genomad`, or when no `--genomad_db` is given.
 
 ### MultiQC
 

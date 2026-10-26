@@ -157,6 +157,20 @@
                     "type": "boolean",
                     "description": "Skip CheckM2 completeness and contamination estimates of the final assembly.",
                     "fa_icon": "fas fa-forward"
+                },
+                "skip_genomad": {
+                    "type": "boolean",
+                    "description": "Skip geNomad identification of plasmids, viruses and proviruses in the final assembly.",
+                    "help_text": "geNomad is also skipped when no `--genomad_db` is given.",
+                    "fa_icon": "fas fa-forward"
+                },
+                "genomad_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "exists": true,
+                    "description": "Path to the geNomad database. geNomad is skipped when this is not given.",
+                    "help_text": "Download the database once with `genomad download-database .` and pass the `genomad_db` directory it creates.",
+                    "fa_icon": "fas fa-database"
                 }
             }
         },

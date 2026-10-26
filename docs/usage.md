@@ -7,7 +7,8 @@ isolate-wf builds a consensus assembly of a bacterial isolate from long reads wi
 subsets, and every subset is assembled with nine assemblers (Flye, Plassembler, Canu,
 metaMDBG, miniasm, Myloasm, Raven, NECAT and NextDenovo). Autocycler then compresses,
 clusters, trims and resolves those assemblies into a single consensus, which is reoriented
-with Dnaapler and assessed with CheckM2.
+with Dnaapler, assessed with CheckM2 and, given a database, searched for plasmids and
+viruses with geNomad.
 
 ## Samplesheet input
 
@@ -104,7 +105,17 @@ at least one must stay on: skipping all of them stops the run at start-up. Fewer
 make the run faster but give Autocycler less to build its consensus from.
 
 Any step can be turned off: `--skip_qc`, `--skip_nanoplot`, `--skip_porechop`,
-`--skip_dnaapler`, `--skip_checkm2`, `--skip_multiqc`. All default to `false`.
+`--skip_dnaapler`, `--skip_checkm2`, `--skip_genomad`, `--skip_multiqc`. All default to `false`.
+
+geNomad, which finds plasmids, viruses and proviruses in the final assembly, needs its database:
+without `--genomad_db` it is skipped as with `--skip_genomad`. Download it once (about 1.4 GB)
+and pass the directory it creates:
+
+```bash
+genomad download-database .
+nextflow run dsamoht/isolate-wf -profile docker --input ./samplesheet.csv --outdir ./results \
+    --genomad_db ./genomad_db
+```
 
 The full, always up-to-date list of parameters is generated from
 [nextflow_schema.json](../nextflow_schema.json):
