@@ -22,6 +22,7 @@ include { AUTOCYCLER_SUBSAMPLE        } from './modules/local/autocycler/subsamp
 include { AUTOCYCLER_TRIM_AND_RESOLVE } from './modules/local/autocycler/trim_and_resolve'
 include { CHECKM2                     } from './modules/local/checkm2'
 include { DNAAPLER                    } from './modules/local/dnaapler'
+include { GENOMAD                     } from './modules/local/genomad'
 include { LONGREAD_QC                 } from './workflows/longread_qc'
 include { MULTIQC                     } from './modules/local/multiqc'
 include { PIPELINE_INITIALISATION     } from './subworkflows/local/pipeline_initialisation'
@@ -50,6 +51,7 @@ params {
     skip_nextdenovo  : Boolean
     skip_dnaapler    : Boolean
     skip_checkm2     : Boolean
+    skip_genomad     : Boolean
     skip_multiqc     : Boolean
     monochrome_logs  : Boolean
     help_full        : Boolean
@@ -228,6 +230,21 @@ workflow ISOLATE_WF {
     }
 
     //
+    // MODULE: identify plasmids, viruses and proviruses in the final assembly
+    //
+    // geNomad has no default database to fall back on: without `--genomad_db` it is skipped
+    // as if `--skip_genomad` had been given
+    ch_genomad_results = channel.empty()
+    if (!params.skip_genomad) {
+        if (params.genomad_db) {
+            ch_genomad_results = GENOMAD(ch_final_assembly, file(params.genomad_db, checkIfExists: true)).results
+            ch_versions        = ch_versions.mix(GENOMAD.out.versions.first())
+        } else {
+            log.info("No --genomad_db given, skipping geNomad")
+        }
+    }
+
+    //
     // Collate software versions
     //
     // Collect the contents rather than the paths: `sort: true` orders the entries by their
@@ -284,6 +301,7 @@ workflow ISOLATE_WF {
     clustering                 = ch_clustered.clustering
     reoriented_assembly        = ch_reoriented_assembly
     checkm2_report             = ch_checkm2_report
+    genomad_results            = ch_genomad_results
 }
 
 /*
@@ -326,6 +344,7 @@ workflow {
     clustering                 = ISOLATE_WF.out.clustering
     reoriented_assembly        = ISOLATE_WF.out.reoriented_assembly
     checkm2_report             = ISOLATE_WF.out.checkm2_report
+    genomad_results            = ISOLATE_WF.out.genomad_results
 }
 
 /*
@@ -369,6 +388,9 @@ output {
     }
     checkm2_report {
         path { meta, _file -> "sample_${meta.id}/checkm2" }
+    }
+    genomad_results {
+        path { meta, dir -> dir >> "sample_${meta.id}/genomad" }
     }
     multiqc_report {
         path "multiqc"
