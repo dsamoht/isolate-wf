@@ -34,6 +34,14 @@ output:
           type: file
           description: Read subsets, one per assembly
           pattern: "subsampled_reads/*.fastq"
+  yaml:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+      - "subsampled_reads/subsample.yaml":
+          type: file
+          description: Read metrics before and after subsampling
+          pattern: "subsampled_reads/subsample.yaml"
   versions:
     - "versions.yml":
         type: file

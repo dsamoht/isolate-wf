@@ -22,6 +22,7 @@ include { AUTOCYCLER_SUBSAMPLE        } from './modules/local/autocycler/subsamp
 include { AUTOCYCLER_TRIM_AND_RESOLVE } from './modules/local/autocycler/trim_and_resolve'
 include { CHECKM2                     } from './modules/local/checkm2'
 include { DNAAPLER                    } from './modules/local/dnaapler'
+include { GENOMAD                     } from './modules/local/genomad'
 include { LONGREAD_QC                 } from './workflows/longread_qc'
 include { MULTIQC                     } from './modules/local/multiqc'
 include { PIPELINE_INITIALISATION     } from './subworkflows/local/pipeline_initialisation'
@@ -50,6 +51,7 @@ params {
     skip_nextdenovo  : Boolean
     skip_dnaapler    : Boolean
     skip_checkm2     : Boolean
+    skip_genomad     : Boolean
     skip_multiqc     : Boolean
     monochrome_logs  : Boolean
     help_full        : Boolean
@@ -95,6 +97,7 @@ workflow ISOLATE_WF {
     // MODULE: split the reads into subsets, one per assembly
     //
     ch_subsampled_reads = AUTOCYCLER_SUBSAMPLE(ch_qc_long_reads.join(ch_genome_size)).reads
+    ch_subsample_yaml   = AUTOCYCLER_SUBSAMPLE.out.yaml
     ch_versions = ch_versions.mix(AUTOCYCLER_SUBSAMPLE.out.versions.first())
 
     // Every read subset is assembled with every assembler not turned off with `--skip_<assembler>`
@@ -178,20 +181,34 @@ workflow ISOLATE_WF {
     //
     // MODULE: trim and resolve each QC-pass cluster
     //
-    ch_resolved_clusters = AUTOCYCLER_TRIM_AND_RESOLVE(ch_qc_clusters).gfa
+    ch_resolved_clusters = AUTOCYCLER_TRIM_AND_RESOLVE(ch_qc_clusters).cluster
     ch_versions = ch_versions.mix(AUTOCYCLER_TRIM_AND_RESOLVE.out.versions.first())
 
-    // Collect all resolved 5_final.gfa graphs to combine per sample
+    // Collect all resolved cluster directories to combine per sample
     ch_all_resolved = ch_resolved_clusters
-        .map { meta, gfa -> [ groupKey(meta.sample, meta.n_clusters), gfa ] }
+        .map { meta, cluster_dir -> [ groupKey(meta.sample, meta.n_clusters), cluster_dir ] }
         .groupTuple()
-        .map { sample, gfas -> [ [ id: sample.toString() ], gfas ] }
+        .map { sample, cluster_dirs -> [ [ id: sample.toString() ], cluster_dirs ] }
 
     //
-    // MODULE: combine the resolved clusters into a final assembly
+    // MODULE: combine the resolved clusters into a final assembly and tabulate the metrics
     //
-    ch_final_assembly = AUTOCYCLER_COMBINE(ch_all_resolved.join(ch_clustered.autocycler_out)).fasta
+    AUTOCYCLER_COMBINE(
+        ch_all_resolved
+            .join(ch_clustered.autocycler_out)
+            .join(ch_subsample_yaml)
+    )
+    ch_final_assembly      = AUTOCYCLER_COMBINE.out.fasta
+    ch_consensus_graph     = AUTOCYCLER_COMBINE.out.gfa
+    ch_autocycler_metrics  = AUTOCYCLER_COMBINE.out.metrics
     ch_versions = ch_versions.mix(AUTOCYCLER_COMBINE.out.versions.first())
+
+    // One table for the whole run: the header of the first file, then a line per sample.
+    // Sorted on the file name, which starts with the sample id, so the order depends neither
+    // on which sample finished first nor on the work directory hashes
+    ch_autocycler_metrics_summary = ch_autocycler_metrics
+        .map { _meta, tsv -> tsv }
+        .collectFile(name: 'autocycler_metrics.tsv', keepHeader: true, sort: { tsv -> tsv.name })
 
     //
     // MODULE: reorient circular contigs to start at dnaA (or repA/terL)
@@ -210,6 +227,21 @@ workflow ISOLATE_WF {
         ch_checkm2_report = CHECKM2(ch_final_assembly).report
         ch_versions       = ch_versions.mix(CHECKM2.out.versions.first())
         ch_multiqc_files  = ch_multiqc_files.mix(ch_checkm2_report.map { _meta, report -> report })
+    }
+
+    //
+    // MODULE: identify plasmids, viruses and proviruses in the final assembly
+    //
+    // geNomad has no default database to fall back on: without `--genomad_db` it is skipped
+    // as if `--skip_genomad` had been given
+    ch_genomad_results = channel.empty()
+    if (!params.skip_genomad) {
+        if (params.genomad_db) {
+            ch_genomad_results = GENOMAD(ch_final_assembly, file(params.genomad_db, checkIfExists: true)).results
+            ch_versions        = ch_versions.mix(GENOMAD.out.versions.first())
+        } else {
+            log.info("No --genomad_db given, skipping geNomad")
+        }
     }
 
     //
@@ -262,9 +294,14 @@ workflow ISOLATE_WF {
     nanoplot_qc_html    = ch_qc_long_reads_out.nanoplot_qc_html
     porechop_log        = ch_qc_long_reads_out.porechop_log
     qc_long_reads       = ch_qc_long_reads
-    final_assembly      = ch_final_assembly
-    reoriented_assembly = ch_reoriented_assembly
-    checkm2_report      = ch_checkm2_report
+    final_assembly             = ch_final_assembly
+    consensus_graph            = ch_consensus_graph
+    autocycler_metrics         = ch_autocycler_metrics
+    autocycler_metrics_summary = ch_autocycler_metrics_summary
+    clustering                 = ch_clustered.clustering
+    reoriented_assembly        = ch_reoriented_assembly
+    checkm2_report             = ch_checkm2_report
+    genomad_results            = ch_genomad_results
 }
 
 /*
@@ -300,9 +337,14 @@ workflow {
     nanoplot_qc_html    = ISOLATE_WF.out.nanoplot_qc_html
     porechop_log        = ISOLATE_WF.out.porechop_log
     qc_long_reads       = ISOLATE_WF.out.qc_long_reads
-    final_assembly      = ISOLATE_WF.out.final_assembly
-    reoriented_assembly = ISOLATE_WF.out.reoriented_assembly
-    checkm2_report      = ISOLATE_WF.out.checkm2_report
+    final_assembly             = ISOLATE_WF.out.final_assembly
+    consensus_graph            = ISOLATE_WF.out.consensus_graph
+    autocycler_metrics         = ISOLATE_WF.out.autocycler_metrics
+    autocycler_metrics_summary = ISOLATE_WF.out.autocycler_metrics_summary
+    clustering                 = ISOLATE_WF.out.clustering
+    reoriented_assembly        = ISOLATE_WF.out.reoriented_assembly
+    checkm2_report             = ISOLATE_WF.out.checkm2_report
+    genomad_results            = ISOLATE_WF.out.genomad_results
 }
 
 /*
@@ -327,11 +369,28 @@ output {
     final_assembly {
         path { meta, _file -> "sample_${meta.id}/autocycler_final" }
     }
+    consensus_graph {
+        path { meta, _file -> "sample_${meta.id}/autocycler_final" }
+    }
+    autocycler_metrics {
+        path { meta, _file -> "sample_${meta.id}/autocycler_final" }
+    }
+    autocycler_metrics_summary {
+        path "."
+    }
+    clustering {
+        // `>>` publishes the directory itself under this name, without the
+        // autocycler_out_work/ nesting it has in the task directory
+        path { meta, dir -> dir >> "sample_${meta.id}/autocycler_clustering" }
+    }
     reoriented_assembly {
         path { meta, _file -> "sample_${meta.id}/dnaapler" }
     }
     checkm2_report {
         path { meta, _file -> "sample_${meta.id}/checkm2" }
+    }
+    genomad_results {
+        path { meta, dir -> dir >> "sample_${meta.id}/genomad" }
     }
     multiqc_report {
         path "multiqc"

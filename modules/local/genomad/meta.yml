@@ -1,0 +1,45 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "genomad"
+description: Identify plasmids, viruses and proviruses in an assembly
+keywords:
+  - genomad
+  - plasmid
+  - virus
+  - provirus
+  - mobile genetic elements
+tools:
+  - "genomad":
+      description: Identification of mobile genetic elements
+      homepage: https://portal.nersc.gov/genomad/
+      documentation: https://portal.nersc.gov/genomad/
+      licence: ["Lawrence Berkeley National Labs BSD variant license"]
+      identifier: biotools:genomad
+input:
+  - - meta:
+        type: map
+        description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+    - assembly:
+        type: file
+        description: Assembly in FASTA format
+  - genomad_db:
+      type: directory
+      description: geNomad database, as downloaded by `genomad download-database`
+output:
+  results:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+      - "genomad_out":
+          type: directory
+          description: geNomad output, with the plasmid and virus summaries in `*_summary/`
+          pattern: "genomad_out"
+  versions:
+    - "versions.yml":
+        type: file
+        description: File containing software versions
+        pattern: "versions.yml"
+authors:
+  - "@dsamoht"
+maintainers:
+  - "@dsamoht"

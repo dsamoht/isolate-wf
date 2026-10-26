@@ -7,13 +7,14 @@ nextflow_pipeline {
     test("-profile test") {
 
         when {
-            // The read paths of the test sample sheet are relative to the repository, and
-            // nf-test launches Nextflow from a directory of its own: point them at the
-            // repository instead, in a copy of the sample sheet.
+            // The test sample sheet points at the read files on the GitHub `main` branch, so
+            // that `-profile test` runs from anywhere. Point them at this checkout instead, in
+            // a copy of the sample sheet: the test then needs no network and runs on the read
+            // files of the branch under test.
             def samplesheet = new File("${outputDir}/samplesheet_test.csv")
             samplesheet.parentFile.mkdirs()
             samplesheet.text = new File("${baseDir}/tests/data/samplesheet_test.csv").text
-                .replaceAll('tests/data/', "${baseDir}/tests/data/")
+                .replace('https://raw.githubusercontent.com/dsamoht/isolate-wf/main/tests/data/', "${baseDir}/tests/data/")
 
             params {
                 input  = samplesheet.toString()
@@ -26,8 +27,14 @@ nextflow_pipeline {
             // everything Autocycler builds on them - clusters, consensus, CheckM2 scores -
             // differs in turn.
             assert workflow.success
-            assert path("$outputDir/sample_test1/autocycler_final/consensus_assembly.fasta").exists()
-            assert path("$outputDir/sample_test2/autocycler_final/consensus_assembly.fasta").exists()
+            ['test1', 'test2'].each { sample ->
+                assert path("$outputDir/sample_${sample}/autocycler_final/consensus_assembly.fasta").exists()
+                assert path("$outputDir/sample_${sample}/autocycler_final/consensus_assembly.gfa").exists()
+                assert path("$outputDir/sample_${sample}/autocycler_final/${sample}_autocycler_metrics.tsv").exists()
+                assert path("$outputDir/sample_${sample}/autocycler_clustering/clustering.tsv").exists()
+            }
+            // A header, then one line per sample
+            assert path("$outputDir/autocycler_metrics.tsv").readLines().size() == 3
             assert path("$outputDir/pipeline_info/isolate-wf_software_mqc_versions.yml").exists()
         }
     }
