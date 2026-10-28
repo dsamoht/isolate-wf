@@ -5,4 +5,4 @@ channels:
   - bioconda
 dependencies:
   - bioconda::autocycler=0.8.0
-  - bioconda::raven-assembler
+  - bioconda::raven-assembler=1.8.3

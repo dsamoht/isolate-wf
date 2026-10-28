@@ -3,19 +3,21 @@
 channels:
   - conda-forge
   - bioconda
-# The assemblers are left unpinned: the docker.io/dsamoht/autocycler image installs the latest
-# Bioconda release of each. Plassembler also needs its database, which only the image ships.
+# Pinned to the assembler versions in the docker.io/dsamoht/autocycler image. Plassembler also
+# needs its database, which only the image ships, and dnaapler, which its 1.9.0 recipe omits.
 dependencies:
   - bioconda::autocycler=0.8.0
-  - bioconda::canu
-  - bioconda::flye
-  - bioconda::metamdbg
-  - bioconda::miniasm
-  - bioconda::minimap2
-  - bioconda::minipolish
-  - bioconda::myloasm
-  - bioconda::necat
-  - bioconda::nextdenovo
-  - bioconda::plassembler
-  - bioconda::racon
-  - bioconda::raven-assembler
+  - bioconda::canu=2.3
+  - bioconda::dnaapler=1.4.0
+  - bioconda::flye=2.9.6
+  - bioconda::metamdbg=1.4
+  - bioconda::miniasm=0.3
+  - bioconda::minimap2=2.31
+  - bioconda::minipolish=0.2.1
+  - bioconda::myloasm=0.7.0
+  - bioconda::necat=0.0.1_update20200803
+  - bioconda::nextdenovo=2.5.2
+  - bioconda::nextpolish=1.4.1
+  - bioconda::plassembler=1.9.0
+  - bioconda::racon=1.5.0
+  - bioconda::raven-assembler=1.8.3
