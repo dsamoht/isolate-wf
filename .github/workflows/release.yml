@@ -40,6 +40,10 @@ jobs:
           V: ${{ inputs.version }}
         run: |
           OLD=$(grep -Po "^\s*version\s*=\s*'\K[^']+" nextflow.config)
+          if [ "$OLD" = "$V" ]; then
+            echo "Version strings already at $V, nothing to bump"
+            exit 0
+          fi
           OLD_RE=${OLD//./\\.}
           sed -i "s/Version: v$OLD_RE\$/Version: v$V/"                      README.md
           sed -i "s/^\(\s*version\s*=\s*\)'$OLD_RE'/\1'$V'/"                 nextflow.config
@@ -61,6 +65,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "Bump version to $V"
-          git push origin main
+          if ! git diff --quiet; then
+            git commit -am "Bump version to $V"
+            git push origin main
+          fi
           gh release create "$V" --target "$(git rev-parse HEAD)" --title "$TITLE" --generate-notes
