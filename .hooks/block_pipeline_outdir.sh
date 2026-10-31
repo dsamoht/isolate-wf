@@ -17,7 +17,7 @@ staged=$(git diff --cached --name-only --diff-filter=AM)
 offenders=$(printf '%s\n' "$staged" | grep -E \
     -e '(^|/)pipeline_info/(execution_(report|timeline|trace)|pipeline_dag)' \
     -e '(^|/)pipeline_info/isolate-wf_software_mqc_versions\.yml$' \
-    -e '(^|/)sample_[^/]+/(reads|quality_assessment|quality_control|autocycler_final|dnaapler|checkm2)/' \
+    -e '(^|/)sample_[^/]+/(reads|quality_assessment|quality_control|autocycler_final|autocycler_clustering|dnaapler|checkm2|genomad)/' \
     -e '(^|/)\.nextflow\.log' \
     -e '(^|/)work/[0-9a-f]{2}/[0-9a-f]{30}' \
     || true)

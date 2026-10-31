@@ -67,7 +67,7 @@ Long reads are trimmed of adapters with Porechop_ABI, then filtered by length
   - `<sample_id>_autocycler_metrics.tsv`: the sample's Autocycler metrics, from `autocycler table`.
 - `sample_<sample_id>/autocycler_clustering/`
   - `clustering.tsv`, `clustering.newick`, `clustering.yaml`: how the input contigs were clustered.
-  - `qc_pass/`, `qc_fail/`: one directory per cluster, with its untrimmed graph (`1_untrimmed.gfa`).
+  - `<sample_id>_autocycler_out.tar.gz`: the whole Autocycler directory, as `autocycler_full.sh` would leave it: the input graph (`input_assemblies.gfa`), the `clustering/qc_pass/` and `qc_fail/` cluster directories with their untrimmed, trimmed and resolved graphs (`1_untrimmed.gfa` to `5_final.gfa`), and the consensus. For a sample whose clusters all fail QC, it stops at the untrimmed graphs.
 - `autocycler_metrics.tsv`: the metrics of every sample in one table.
 
 </details>
@@ -82,9 +82,11 @@ The metrics tables help judge how much to trust a consensus: `pass_cluster_count
 `fail_cluster_count` count the putative replicons kept and dropped, `overall_clustering_score`
 measures how consistently the assemblies agree on them (1 is best), and
 `consensus_assembly_fully_resolved` tells whether every replicon resolved to one contig. A
-sample whose clusters all fail QC has no metrics line, but its clustering directory is still
-published: [the Autocycler wiki](https://github.com/rrwick/Autocycler/wiki) explains how to read
-it and curate the clusters by hand.
+sample whose clusters all fail QC has no metrics line, but its clustering and archive are still
+published. Extract the archive with `tar -xzf <sample_id>_autocycler_out.tar.gz` to open the
+graphs in Bandage, or to re-run Autocycler on `autocycler_out/` from `autocycler cluster` on:
+[the Autocycler wiki](https://github.com/rrwick/Autocycler/wiki) explains how to read the clusters
+and curate them by hand.
 
 ### Reorientation
 

@@ -203,6 +203,13 @@ workflow ISOLATE_WF {
     ch_autocycler_metrics  = AUTOCYCLER_COMBINE.out.metrics
     ch_versions = ch_versions.mix(AUTOCYCLER_COMBINE.out.versions.first())
 
+    // One archive of the Autocycler directory per sample. The one from AUTOCYCLER_COMBINE
+    // also holds the trimmed and resolved clusters and the consensus; a sample with no
+    // cluster passing QC never gets there and falls back on the one from AUTOCYCLER_CLUSTER
+    ch_autocycler_archive = ch_clustered.archive
+        .join(AUTOCYCLER_COMBINE.out.archive, remainder: true)
+        .map { meta, cluster_archive, combine_archive -> [ meta, combine_archive ?: cluster_archive ] }
+
     // One table for the whole run: the header of the first file, then a line per sample.
     // Sorted on the file name, which starts with the sample id, so the order depends neither
     // on which sample finished first nor on the work directory hashes
@@ -299,6 +306,7 @@ workflow ISOLATE_WF {
     autocycler_metrics         = ch_autocycler_metrics
     autocycler_metrics_summary = ch_autocycler_metrics_summary
     clustering                 = ch_clustered.clustering
+    autocycler_archive         = ch_autocycler_archive
     reoriented_assembly        = ch_reoriented_assembly
     checkm2_report             = ch_checkm2_report
     genomad_results            = ch_genomad_results
@@ -342,6 +350,7 @@ workflow {
     autocycler_metrics         = ISOLATE_WF.out.autocycler_metrics
     autocycler_metrics_summary = ISOLATE_WF.out.autocycler_metrics_summary
     clustering                 = ISOLATE_WF.out.clustering
+    autocycler_archive         = ISOLATE_WF.out.autocycler_archive
     reoriented_assembly        = ISOLATE_WF.out.reoriented_assembly
     checkm2_report             = ISOLATE_WF.out.checkm2_report
     genomad_results            = ISOLATE_WF.out.genomad_results
@@ -379,9 +388,10 @@ output {
         path "."
     }
     clustering {
-        // `>>` publishes the directory itself under this name, without the
-        // autocycler_out_work/ nesting it has in the task directory
-        path { meta, dir -> dir >> "sample_${meta.id}/autocycler_clustering" }
+        path { meta, _files -> "sample_${meta.id}/autocycler_clustering" }
+    }
+    autocycler_archive {
+        path { meta, _file -> "sample_${meta.id}/autocycler_clustering" }
     }
     reoriented_assembly {
         path { meta, _file -> "sample_${meta.id}/dnaapler" }

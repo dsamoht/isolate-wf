@@ -43,10 +43,18 @@ output:
     - - meta:
           type: map
           description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
-      - "autocycler_out_work/clustering":
-          type: directory
-          description: Clustering results (clustering.tsv, clustering.newick, clustering.yaml) and the qc_pass and qc_fail cluster directories
-          pattern: "autocycler_out_work/clustering"
+      - "clustering.{tsv,newick,yaml}":
+          type: file
+          description: Clustering results (clustering.tsv, clustering.newick, clustering.yaml)
+          pattern: "clustering.{tsv,newick,yaml}"
+  archive:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+      - "*_autocycler_out.tar.gz":
+          type: file
+          description: The Autocycler directory after clustering, archived as autocycler_out/
+          pattern: "*_autocycler_out.tar.gz"
   versions:
     - "versions.yml":
         type: file
