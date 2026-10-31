@@ -16,6 +16,8 @@ process AUTOCYCLER_COMBINE {
     tuple val(meta), path("consensus_assembly.fasta")     , emit: fasta  , optional: true
     tuple val(meta), path("consensus_assembly.gfa")       , emit: gfa    , optional: true
     tuple val(meta), path("*_autocycler_metrics.tsv")     , emit: metrics
+    // The whole Autocycler directory: input graph, clusters trimmed and resolved, consensus
+    tuple val(meta), path("*_autocycler_out.tar.gz")      , emit: archive
     path "versions.yml"                                   , emit: versions
 
     script:
@@ -42,6 +44,12 @@ process AUTOCYCLER_COMBINE {
         autocycler table
         autocycler table -a autocycler_out_final -n ${prefix}
     } > ${prefix}_autocycler_metrics.tsv
+
+    # Archived as autocycler_out/, the name Autocycler gives it, through a symlink that
+    # `tar -h` follows: GNU and BSD tar both take it, unlike GNU's --transform
+    mkdir archive
+    ln -s ../autocycler_out_final archive/autocycler_out
+    tar -chzf ${prefix}_autocycler_out.tar.gz -C archive autocycler_out
 
     # Lift the consensus out of the Autocycler directory so it publishes without the nesting
     for ext in fasta gfa; do

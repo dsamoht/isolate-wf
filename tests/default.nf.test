@@ -32,6 +32,7 @@ nextflow_pipeline {
                 assert path("$outputDir/sample_${sample}/autocycler_final/consensus_assembly.gfa").exists()
                 assert path("$outputDir/sample_${sample}/autocycler_final/${sample}_autocycler_metrics.tsv").exists()
                 assert path("$outputDir/sample_${sample}/autocycler_clustering/clustering.tsv").exists()
+                assert path("$outputDir/sample_${sample}/autocycler_clustering/${sample}_autocycler_out.tar.gz").exists()
             }
             // A header, then one line per sample
             assert path("$outputDir/autocycler_metrics.tsv").readLines().size() == 3

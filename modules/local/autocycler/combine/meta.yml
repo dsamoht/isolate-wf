@@ -53,6 +53,14 @@ output:
           type: file
           description: Header and one line of Autocycler metrics, from `autocycler table`
           pattern: "*_autocycler_metrics.tsv"
+  archive:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+      - "*_autocycler_out.tar.gz":
+          type: file
+          description: The complete Autocycler directory, with the resolved clusters and the consensus, archived as autocycler_out/
+          pattern: "*_autocycler_out.tar.gz"
   versions:
     - "versions.yml":
         type: file
