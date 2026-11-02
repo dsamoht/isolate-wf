@@ -15,6 +15,7 @@ workflow LONGREAD_QC {
     ch_nanoplot_raw_out = [ html: channel.empty(), txt: channel.empty(), versions: channel.empty() ]
     ch_nanoplot_qc_out  = [ html: channel.empty(), txt: channel.empty(), versions: channel.empty() ]
     ch_porechop_log     = channel.empty()
+    ch_chopper_log      = channel.empty()
 
     if (!params.skip_qc) {
         //
@@ -45,6 +46,7 @@ workflow LONGREAD_QC {
         CHOPPER(ch_porechopped_reads)
         ch_versions        = ch_versions.mix(CHOPPER.out.versions.first())
         ch_choppered_reads = CHOPPER.out.fastq
+        ch_chopper_log     = CHOPPER.out.log
 
         //
         // MODULE: read quality report after trimming
@@ -63,7 +65,10 @@ workflow LONGREAD_QC {
     emit:
     nanoplot_raw_html = ch_nanoplot_raw_out.html
     nanoplot_qc_html  = ch_nanoplot_qc_out.html
+    nanoplot_raw_txt  = ch_nanoplot_raw_out.txt
+    nanoplot_qc_txt   = ch_nanoplot_qc_out.txt
     porechop_log      = ch_porechop_log
+    chopper_log       = ch_chopper_log
     long_reads_qc     = ch_long_reads_qc
     versions          = ch_versions
     multiqc_files     = ch_multiqc_files

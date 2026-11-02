@@ -1,0 +1,73 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "sample_summary"
+description: Write a log of what every step did for one sample and which files it published
+keywords:
+  - summary
+  - log
+  - report
+tools:
+  - "isolate_wf_summary.py":
+      description: Script of this pipeline (bin/) that reads the outputs of every step and writes the log
+      homepage: https://github.com/dsamoht/isolate-wf
+      licence: ["MIT"]
+      identifier: ""
+input:
+  - - meta:
+        type: map
+        description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+    - info:
+        type: map
+        description: Values from the workflow (input reads, genome size, assemblers, subsets, skipped steps)
+    - nanoplot_raw:
+        type: file
+        description: NanoStats.txt of the raw reads
+    - porechop:
+        type: file
+        description: Porechop_ABI log
+    - chopper:
+        type: file
+        description: chopper log
+    - nanoplot_qc:
+        type: file
+        description: NanoStats.txt of the QC'd reads
+    - subsample:
+        type: file
+        description: subsample.yaml from `autocycler subsample`
+    - assemblies:
+        type: file
+        description: Assemblies from `autocycler helper`, named <assembler>_<subset>.fasta
+    - clustering:
+        type: file
+        description: clustering.tsv, clustering.newick and clustering.yaml
+    - metrics:
+        type: file
+        description: The sample's line of `autocycler table`
+    - consensus:
+        type: file
+        description: Consensus assembly
+    - dnaapler:
+        type: file
+        description: Dnaapler reorientation summary
+    - checkm2:
+        type: file
+        description: CheckM2 quality report
+    - genomad:
+        type: directory
+        description: geNomad output directory
+    - versions:
+        type: file
+        description: Collated software versions of the run
+output:
+  log:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+      - "isolate-wf_sample_*_summary.log":
+          type: file
+          description: Summary log of the sample
+          pattern: "isolate-wf_sample_*_summary.log"
+authors:
+  - "@dsamoht"
+maintainers:
+  - "@dsamoht"

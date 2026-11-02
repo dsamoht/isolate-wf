@@ -14,6 +14,8 @@ process CHOPPER {
 
     output:
     tuple val(meta), path("*.choppered.fastq.gz"), emit: fastq
+    // chopper reports how many reads it kept on stderr
+    tuple val(meta), path("*.chopper.log")       , emit: log
     path "versions.yml"                          , emit: versions
 
     script:
@@ -21,8 +23,12 @@ process CHOPPER {
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
     # chopper reads gzipped and plain FastQ alike when given the file itself
-    chopper ${args} --threads ${task.cpus} -i ${reads} \
-        | gzip > ${prefix}.choppered.fastq.gz
+    # Its stderr goes to the log, then on to the task's own stderr, failed or not, so an
+    # error still shows in .command.err
+    chopper ${args} --threads ${task.cpus} -i ${reads} 2> ${prefix}.chopper.log \
+        | gzip > ${prefix}.choppered.fastq.gz \
+        || { cat ${prefix}.chopper.log >&2; exit 1; }
+    cat ${prefix}.chopper.log >&2
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

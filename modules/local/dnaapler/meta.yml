@@ -30,6 +30,14 @@ output:
           type: file
           description: Reoriented assembly
           pattern: "dnaapler_out/*_reoriented.fasta"
+  summary:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+      - "dnaapler_out/*_all_reorientation_summary.tsv":
+          type: file
+          description: The gene each contig was reoriented to, if any
+          pattern: "dnaapler_out/*_all_reorientation_summary.tsv"
   versions:
     - "versions.yml":
         type: file
