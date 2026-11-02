@@ -14,6 +14,8 @@ process DNAAPLER {
 
     output:
     tuple val(meta), path("dnaapler_out/*_reoriented.fasta"), emit: fasta
+    // Which gene each contig now starts at, for the sample summary
+    tuple val(meta), path("dnaapler_out/*_all_reorientation_summary.tsv"), emit: summary, optional: true
     path "versions.yml"                                     , emit: versions
 
     script:

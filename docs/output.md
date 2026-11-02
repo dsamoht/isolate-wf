@@ -13,6 +13,7 @@ report and the pipeline information, which are global.
 - [Reorientation](#reorientation) — Dnaapler
 - [Assembly quality](#assembly-quality) — CheckM2
 - [Mobile genetic elements](#mobile-genetic-elements) — geNomad
+- [Sample summary](#sample-summary)
 - [MultiQC](#multiqc)
 - [Pipeline information](#pipeline-information)
 
@@ -128,6 +129,24 @@ Skipped with `--skip_checkm2`.
 </details>
 
 Skipped with `--skip_genomad`, or when no `--genomad_db` is given.
+
+### Sample summary
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `sample_<sample_id>/`
+  - `isolate-wf_sample_<sample_id>_summary.log`: what every step did for the sample, its key numbers, and the files it published.
+
+</details>
+
+The log starts with the outcome (the consensus, or why there is none), then has one
+section per step, in the order they run: the reads kept by each QC step, the genome size and
+read subsets, which assemblies produced contigs, the clusters kept, the consensus contigs and
+whether they resolved, the gene each circular contig was reoriented to, the CheckM2
+completeness and contamination, and the plasmids, viruses and proviruses geNomad found. A
+step that was skipped says with which flag; one that was never reached says why. The
+software versions of the run close it.
 
 ### MultiQC
 

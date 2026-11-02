@@ -26,6 +26,7 @@ include { GENOMAD                     } from './modules/local/genomad'
 include { LONGREAD_QC                 } from './workflows/longread_qc'
 include { MULTIQC                     } from './modules/local/multiqc'
 include { PIPELINE_INITIALISATION     } from './subworkflows/local/pipeline_initialisation'
+include { SAMPLE_SUMMARY              } from './modules/local/sample_summary'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -58,6 +59,23 @@ params {
     show_hidden      : Boolean
     version          : Boolean
     validate_params  : Boolean
+}
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    FUNCTIONS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+// Tag the files of one step with their sample id and the step, for SAMPLE_SUMMARY
+def tagStep(ch, step) {
+    return ch.map { meta, files -> [ meta.id.toString(), step, files ] }
+}
+
+// The first of these flags that is set, as it is given on the command line, or ''
+def skipFlag(flags) {
+    def flag = flags.find { name -> params[name] }
+    return flag ? "--${flag}" : ''
 }
 
 /*
@@ -101,10 +119,11 @@ workflow ISOLATE_WF {
     ch_versions = ch_versions.mix(AUTOCYCLER_SUBSAMPLE.out.versions.first())
 
     // Every read subset is assembled with every assembler not turned off with `--skip_<assembler>`
-    def assemblers = [
+    def all_assemblers = [
         'flye', 'plassembler', 'canu', 'metamdbg',
         'miniasm', 'myloasm', 'raven', 'necat', 'nextdenovo'
-    ].findAll { assembler -> !params["skip_${assembler}"] }
+    ]
+    def assemblers = all_assemblers.findAll { assembler -> !params["skip_${assembler}"] }
 
     // Flatten subsamples so each read subset is assembled independently. Each task carries
     // the number of assemblies its sample expects, so a sample is regrouped as soon as its
@@ -221,8 +240,10 @@ workflow ISOLATE_WF {
     // MODULE: reorient circular contigs to start at dnaA (or repA/terL)
     //
     ch_reoriented_assembly = channel.empty()
+    ch_dnaapler_summary    = channel.empty()
     if (!params.skip_dnaapler) {
         ch_reoriented_assembly = DNAAPLER(ch_final_assembly).fasta
+        ch_dnaapler_summary    = DNAAPLER.out.summary
         ch_versions = ch_versions.mix(DNAAPLER.out.versions.first())
     }
 
@@ -262,6 +283,75 @@ workflow ISOLATE_WF {
         .map { versions -> versions.text }
         .unique()
         .collectFile(name: 'isolate-wf_software_mqc_versions.yml', sort: true)
+
+    //
+    // MODULE: one summary log per sample, of what every step did and what it published
+    //
+    // Each step's files are tagged with the step and grouped by sample. A step that was
+    // skipped, or never reached because every assembler or every cluster failed, sends
+    // nothing, and the summary tells the two apart from the flags in `info`. The grouping
+    // waits for the end of the run, which is when every log can be complete anyway.
+    def summary_steps = [
+        'nanoplot_raw', 'porechop', 'chopper', 'nanoplot_qc', 'subsample', 'assemblies',
+        'clustering', 'metrics', 'consensus', 'dnaapler', 'checkm2', 'genomad'
+    ]
+
+    ch_summary_files = channel.empty()
+        .mix(
+            tagStep(ch_qc_long_reads_out.nanoplot_raw_txt, 'nanoplot_raw'),
+            tagStep(ch_qc_long_reads_out.porechop_log, 'porechop'),
+            tagStep(ch_qc_long_reads_out.chopper_log, 'chopper'),
+            tagStep(ch_qc_long_reads_out.nanoplot_qc_txt, 'nanoplot_qc'),
+            tagStep(ch_subsample_yaml, 'subsample'),
+            ch_raw_assemblies.map { meta, fastas -> [ meta.sample.toString(), 'assemblies', fastas ] },
+            tagStep(ch_clustered.clustering, 'clustering'),
+            tagStep(ch_autocycler_metrics, 'metrics'),
+            tagStep(ch_final_assembly, 'consensus'),
+            tagStep(ch_dnaapler_summary, 'dnaapler'),
+            tagStep(ch_checkm2_report, 'checkm2'),
+            tagStep(ch_genomad_results, 'genomad')
+        )
+        .groupTuple()
+
+    // The values that are not files: the input reads, the genome size and the subset names
+    ch_summary_values = ch_raw_long_reads
+        .map { meta, reads -> [ meta.id.toString(), reads ] }
+        .join(ch_genome_size.map { meta, size -> [ meta.id.toString(), size ] }, remainder: true)
+        .join(
+            ch_subsampled_reads.map { meta, read_files ->
+                [ meta.id.toString(), [read_files].flatten().collect { read_file -> read_file.baseName.tokenize('_').last() } ]
+            },
+            remainder: true
+        )
+
+    ch_summary_input = ch_summary_values
+        .join(ch_summary_files, remainder: true)
+        .map { id, reads, genome_size, subsamples, steps, files ->
+            def by_step = summary_steps.collectEntries { step -> [ step, [] ] }
+            (steps ?: []).eachWithIndex { step, index -> by_step[step] += [files[index]].flatten() }
+            def info = [
+                sample             : id,
+                pipeline_version   : workflow.manifest.version,
+                reads              : reads.toUriString(),
+                read_type          : params.read_type,
+                genome_size        : genome_size,
+                subsamples         : subsamples ?: [],
+                assemblers         : assemblers,
+                skipped_assemblers : all_assemblers.findAll { assembler -> params["skip_${assembler}"] },
+                chopper_minlength  : params.chopper_minlength,
+                chopper_minq       : params.chopper_minq,
+                skip_nanoplot      : skipFlag(['skip_qc', 'skip_nanoplot']),
+                skip_porechop      : skipFlag(['skip_qc', 'skip_porechop']),
+                skip_chopper       : skipFlag(['skip_qc']),
+                skip_dnaapler      : skipFlag(['skip_dnaapler']),
+                skip_checkm2       : skipFlag(['skip_checkm2']),
+                skip_genomad       : params.skip_genomad ? '--skip_genomad' : (params.genomad_db ? '' : 'no --genomad_db given')
+            ]
+            [ [ id: id ], info ] + summary_steps.collect { step -> by_step[step] }
+        }
+        .combine(ch_collated_versions)
+
+    ch_summary_log = SAMPLE_SUMMARY(ch_summary_input).log
 
     //
     // MODULE: MultiQC
@@ -310,6 +400,7 @@ workflow ISOLATE_WF {
     reoriented_assembly        = ch_reoriented_assembly
     checkm2_report             = ch_checkm2_report
     genomad_results            = ch_genomad_results
+    summary_log                = ch_summary_log
 }
 
 /*
@@ -354,6 +445,7 @@ workflow {
     reoriented_assembly        = ISOLATE_WF.out.reoriented_assembly
     checkm2_report             = ISOLATE_WF.out.checkm2_report
     genomad_results            = ISOLATE_WF.out.genomad_results
+    summary_log                = ISOLATE_WF.out.summary_log
 }
 
 /*
@@ -401,6 +493,11 @@ output {
     }
     genomad_results {
         path { meta, dir -> dir >> "sample_${meta.id}/genomad" }
+    }
+    // The summary log lists the published paths of every step: keep it in line with this
+    // block (bin/isolate_wf_summary.py)
+    summary_log {
+        path { meta, _file -> "sample_${meta.id}" }
     }
     multiqc_report {
         path "multiqc"

@@ -33,6 +33,9 @@ nextflow_pipeline {
                 assert path("$outputDir/sample_${sample}/autocycler_final/${sample}_autocycler_metrics.tsv").exists()
                 assert path("$outputDir/sample_${sample}/autocycler_clustering/clustering.tsv").exists()
                 assert path("$outputDir/sample_${sample}/autocycler_clustering/${sample}_autocycler_out.tar.gz").exists()
+                def summary = path("$outputDir/sample_${sample}/isolate-wf_sample_${sample}_summary.log").text
+                assert summary.contains("Result: Consensus assembly")
+                assert summary.contains("Not run: skipped (--skip_checkm2)")
             }
             // A header, then one line per sample
             assert path("$outputDir/autocycler_metrics.tsv").readLines().size() == 3

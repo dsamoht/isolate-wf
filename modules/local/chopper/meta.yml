@@ -30,6 +30,14 @@ output:
           type: file
           description: Choppered.fastq.gz
           pattern: "*.choppered.fastq.gz"
+  log:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample or group information, e.g. `[ id:'group1' ]`
+      - "*.chopper.log":
+          type: file
+          description: chopper's stderr, with the number of reads kept
+          pattern: "*.chopper.log"
   versions:
 authors:
   - "@dsamoht"
