@@ -326,15 +326,40 @@ def section_assembly(log, info, directory):
     return succeeded
 
 
-def section_clustering(log, info, directory, assemblies_ok):
+def report_assembly_filter(log, filter_file):
+    """The outlier filter of AUTOCYCLER_COMPRESS: which assemblies it left out, and why."""
+    rows = read_tsv(filter_file)
+    counts = sorted(int(row["contigs"]) for row in rows if int(row["contigs"]) > 0)
+    excluded = [row for row in rows if row["status"] == "excluded"]
+    limit = rows[0]["limit"] if rows else "?"
+    median = counts[(len(counts) + 1) // 2 - 1] if counts else "?"
+    log.add(
+        f"Outlier filter: median of {plural(median, 'contig') if counts else '? contigs'} over {len(counts)} non-empty"
+        f" {'assembly' if len(counts) == 1 else 'assemblies'}, limit {limit} contigs.",
+        4,
+    )
+    if excluded:
+        log.add(f"Left out of the compression, {len(excluded)} above the limit:", 4)
+        for row in excluded:
+            log.add(f"{row['assembly']:<22} {plural(int(row['contigs']), 'contig')}", 6)
+    else:
+        log.add("No assembly was left out.", 4)
+
+
+def section_clustering(log, info, directory, filter_dir, assemblies_ok):
     log.section("Compression and clustering", "Autocycler")
+    filter_file = first_file(filter_dir, "assembly_filter.tsv")
     yaml_file = first_file(directory, "clustering.yaml")
     if yaml_file is None:
+        if filter_file:
+            report_assembly_filter(log, filter_file)
         not_run(log, "no assembly produced contigs" if not assemblies_ok else "no clustering for this sample")
         return None
     values = read_flat_yaml(yaml_file)
     log.add("Compressed every assembly into one unitig graph, then grouped their contigs", 4)
     log.add("into putative replicons (clusters) and kept those that pass QC.", 4)
+    if filter_file:
+        report_assembly_filter(log, filter_file)
     passed, failed = int(values.get("pass_cluster_count", 0)), int(values.get("fail_cluster_count", 0))
     log.add(f"Clusters: {passed} passed QC, {failed} failed", 4)
     log.add(
@@ -348,6 +373,7 @@ def section_clustering(log, info, directory, assemblies_ok):
     sample = info["sample"]
     log.outputs([
         "autocycler_clustering/clustering.tsv, clustering.newick, clustering.yaml",
+        "autocycler_clustering/assembly_filter.tsv" if filter_file else None,
         f"autocycler_clustering/{sample}_autocycler_out.tar.gz",
     ])
     return passed
@@ -434,24 +460,38 @@ def section_checkm2(log, info, directory, has_consensus):
     log.section("Completeness and contamination", "CheckM2")
     if info.get("skip_checkm2"):
         not_run(log, f"skipped ({info['skip_checkm2']})")
-        return
+        return []
     if not has_consensus:
         not_run(log, "no consensus assembly")
-        return
+        return []
     report = first_file(directory, "quality_report.tsv")
     if report is None:
         not_run(log, "no CheckM2 report for this sample")
-        return
+        return []
     rows = read_tsv(report)
     log.add("Estimated the completeness and contamination of the consensus assembly", 4)
     log.add("from its marker genes.", 4)
+    warnings = []
+    min_completeness = float(info.get("checkm2_min_completeness") or 90)
+    max_contamination = float(info.get("checkm2_max_contamination") or 5)
     for row in rows:
         log.add(
             f"Completeness: {row.get('Completeness', '?')}% | Contamination: {row.get('Contamination', '?')}%"
             f" | Model: {row.get('Completeness_Model_Used', '?')}",
             4,
         )
+        try:
+            completeness, contamination = float(row["Completeness"]), float(row["Contamination"])
+        except (KeyError, ValueError):
+            continue
+        if completeness < min_completeness:
+            warnings.append(f"CheckM2 completeness {completeness:g}% < {min_completeness:g}%")
+        if contamination > max_contamination:
+            warnings.append(f"CheckM2 contamination {contamination:g}% > {max_contamination:g}%, possibly a mixed culture")
+    for warning in warnings:
+        log.add(f"WARNING: {warning}", 4)
     log.outputs(["checkm2/checkm2_out/quality_report.tsv"])
+    return warnings
 
 
 def section_genomad(log, info, directory, has_consensus):
@@ -486,6 +526,86 @@ def section_genomad(log, info, directory, has_consensus):
     log.outputs([f"genomad/{prefix}/"])
 
 
+def section_gtdbtk(log, info, directory, has_consensus):
+    log.section("Taxonomy", "GTDB-Tk")
+    sample = info["sample"]
+    if not info.get("run_gtdbtk"):
+        not_run(log, "off (turn it on with --run_gtdbtk)")
+        return
+    if not has_consensus:
+        not_run(log, "no consensus assembly")
+        return
+    rows = [row for path in files_in(directory, "gtdbtk.*.summary.tsv") for row in read_tsv(path)]
+    rows = [row for row in rows if row.get("user_genome") == sample]
+    if not rows:
+        not_run(log, "no GTDB-Tk classification for this sample")
+        return
+    log.add("Placed the assembly in the GTDB reference tree, with the other samples of the run.", 4)
+    for row in rows:
+        log.add(f"Classification: {row.get('classification', '?')}", 4)
+        reference = row.get("closest_genome_reference") or row.get("fastani_reference")
+        ani = row.get("closest_genome_ani") or row.get("fastani_ani")
+        if reference and reference != "N/A":
+            log.add(f"Closest reference: {reference} (ANI {ani}%)", 4)
+        note = row.get("note")
+        if note and note != "N/A":
+            log.add(f"Note: {note}", 4)
+    log.outputs(["../gtdbtk/gtdbtk_out/ (every sample)"])
+
+
+def section_dedup(log, info, directory, has_consensus):
+    log.section("Duplicate isolates", "skani")
+    sample = info["sample"]
+    if not info.get("run_dedup"):
+        not_run(log, "off (turn it on with --run_dedup)")
+        return []
+    if not has_consensus:
+        not_run(log, "no consensus assembly")
+        return []
+    table = first_file(directory, "duplicate_isolates.tsv")
+    if table is None:
+        not_run(log, "no skani comparison for this run")
+        return []
+    log.add(
+        f"Compared the assembly with those of every other sample; the same strain is"
+        f" ANI >= {info.get('dedup_min_ani', '?')}% over >= {info.get('dedup_min_af', '?')}% of both.",
+        4,
+    )
+    duplicates = []
+    for row in read_tsv(table):
+        if sample not in (row.get("sample_1"), row.get("sample_2")):
+            continue
+        other = row["sample_2"] if row["sample_1"] == sample else row["sample_1"]
+        duplicates.append(other)
+        log.add(f"Same strain as {other}: ANI {row.get('ani', '?')}%, aligned {row.get('af_1', '?')}% / {row.get('af_2', '?')}%", 4)
+    if duplicates:
+        log.add(f"WARNING: likely the same strain as {', '.join(duplicates)}", 4)
+    else:
+        log.add("No other sample is the same strain.", 4)
+    log.outputs(["../dedup/duplicate_isolates.tsv, skani_triangle.tsv (every sample)"])
+    return [f"same strain as {', '.join(duplicates)}"] if duplicates else []
+
+
+def failure_reason(info, inputs, assemblies_ok, passed):
+    """Why a sample got no consensus: the first step that produced nothing."""
+    if not info.get("genome_size"):
+        return "the genome size could not be estimated (too few reads, or AUTOCYCLER_GENOME_SIZE failed)."
+    if first_file(inputs / "subsample", "subsample.yaml") is None:
+        return "the reads could not be split into subsets (AUTOCYCLER_SUBSAMPLE failed)."
+    if not assemblies_ok:
+        return "every assembler failed."
+    if first_file(inputs / "compress", "assembly_filter.tsv") is None:
+        return (
+            "AUTOCYCLER_COMPRESS failed: most assemblies are fragmented (low depth or a mixed"
+            " culture), or too few were left after the outlier filter."
+        )
+    if passed is None:
+        return "the contigs could not be clustered (AUTOCYCLER_CLUSTER failed)."
+    if passed == 0:
+        return "no cluster passed Autocycler QC."
+    return "the clusters could not be trimmed, resolved or combined."
+
+
 # --------------------------------------------------------------------------- main
 
 
@@ -495,6 +615,7 @@ def main():
     parser.add_argument("--versions", help="Collated software versions YAML")
     parser.add_argument("--inputs", required=True, help="Directory holding one subdirectory per step")
     parser.add_argument("--output", required=True)
+    parser.add_argument("--result", help="One-line TSV of the sample's result, for the table of the run")
     args = parser.parse_args()
 
     info = read_info(args.info)
@@ -516,11 +637,13 @@ def main():
     section_genome_size(log, info)
     section_subsample(log, inputs / "subsample")
     assemblies_ok = section_assembly(log, info, inputs / "assemblies")
-    passed = section_clustering(log, info, inputs / "clustering", assemblies_ok)
+    passed = section_clustering(log, info, inputs / "clustering", inputs / "compress", assemblies_ok)
     records = section_consensus(log, info, inputs / "metrics", inputs / "consensus", passed)
     section_dnaapler(log, info, inputs / "dnaapler", bool(records))
-    section_checkm2(log, info, inputs / "checkm2", bool(records))
+    warnings = section_checkm2(log, info, inputs / "checkm2", bool(records))
     section_genomad(log, info, inputs / "genomad", bool(records))
+    section_gtdbtk(log, info, inputs / "gtdbtk", bool(records))
+    warnings += section_dedup(log, info, inputs / "dedup", bool(records))
 
     # The outcome goes at the top, where it is read first
     if records:
@@ -529,13 +652,16 @@ def main():
             f"Consensus assembly: {plural(len(records), 'contig')} ({circular} circular),"
             f" {num(sum(length for _, length, _ in records))} bp"
         )
-    elif not assemblies_ok:
-        outcome = "No consensus assembly: every assembler failed."
-    elif passed == 0:
-        outcome = "No consensus assembly: no cluster passed Autocycler QC."
     else:
-        outcome = "No consensus assembly."
-    log.lines[result_index:result_index] = ["", f"Result: {outcome}"]
+        outcome = f"No consensus assembly: {failure_reason(info, inputs, assemblies_ok, passed)}"
+    header = ["", f"Result: {outcome}"] + [f"WARNING: {warning}" for warning in warnings]
+    log.lines[result_index:result_index] = header
+
+    if args.result:
+        with open(args.result, "w", newline="") as handle:
+            writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+            writer.writerow(["sample", "status", "result", "warnings"])
+            writer.writerow([sample, "assembled" if records else "no_assembly", outcome, "; ".join(warnings)])
 
     if log.versions:
         log.add()
