@@ -11,7 +11,7 @@
 | \__ \ (_) | | (_| | ||  __/_____\ V  V /|  _|
 |_|___/\___/|_|\__,_|\__\___|      \_/\_/ |_|
 
-Nextflow wrapper for the Autocycler long-read consensus
+Wrapper for the Autocycler long-read consensus
 genome assembly pipeline
 
      Github: https://github.com/dsamoht/isolate-wf
