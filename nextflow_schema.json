@@ -54,6 +54,13 @@
                     "type": "boolean",
                     "description": "Skip Dnaapler reorientation of the final assembly.",
                     "fa_icon": "fas fa-forward"
+                },
+                "skip_failed_samples": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Let a sample whose task fails stop on its own, while the other samples carry on.",
+                    "help_text": "A task that still fails after its retries ends its sample only: the later steps of that sample are not run, and its summary log says where it stopped. Set to `false` to stop the whole run at the first failure instead.",
+                    "fa_icon": "fas fa-shield-alt"
                 }
             }
         },
@@ -171,6 +178,66 @@
                     "description": "Path to the geNomad database. geNomad is skipped when this is not given.",
                     "help_text": "Download the database once with `genomad download-database .` and pass the `genomad_db` directory it creates.",
                     "fa_icon": "fas fa-database"
+                },
+                "checkm2_min_completeness": {
+                    "type": "number",
+                    "default": 90,
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Flag the assemblies under this CheckM2 completeness (%) in the summary logs.",
+                    "fa_icon": "fas fa-exclamation-triangle"
+                },
+                "checkm2_max_contamination": {
+                    "type": "number",
+                    "default": 5,
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Flag the assemblies over this CheckM2 contamination (%) in the summary logs.",
+                    "help_text": "High contamination in an isolate often means a mixed culture.",
+                    "fa_icon": "fas fa-exclamation-triangle"
+                }
+            }
+        },
+        "run_level_options": {
+            "title": "Run-level options",
+            "type": "object",
+            "fa_icon": "fas fa-layer-group",
+            "description": "Optional steps run once on the final assemblies of every sample.",
+            "properties": {
+                "run_gtdbtk": {
+                    "type": "boolean",
+                    "description": "Classify the final assemblies with GTDB-Tk classify_wf.",
+                    "help_text": "Needs `--gtdbtk_db`. Runs once for the whole run, with `--skip_ani_screen` by default.",
+                    "fa_icon": "fas fa-sitemap"
+                },
+                "gtdbtk_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "exists": true,
+                    "description": "Path to the unpacked GTDB-Tk reference data (GTDBTK_DATA_PATH).",
+                    "help_text": "The data release must match the GTDB-Tk version: GTDB-Tk 2.6.1 uses release R226.",
+                    "fa_icon": "fas fa-database"
+                },
+                "run_dedup": {
+                    "type": "boolean",
+                    "description": "Compare every pair of final assemblies with skani and flag the duplicate isolates.",
+                    "fa_icon": "fas fa-clone"
+                },
+                "dedup_min_ani": {
+                    "type": "number",
+                    "default": 99.9,
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Minimum ANI (%) for two isolates to be flagged as the same strain.",
+                    "fa_icon": "fas fa-percent"
+                },
+                "dedup_min_af": {
+                    "type": "number",
+                    "default": 95,
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Minimum aligned fraction (%), in both directions, for two isolates to be flagged as the same strain.",
+                    "fa_icon": "fas fa-percent"
                 }
             }
         },
@@ -329,6 +396,9 @@
         },
         {
             "$ref": "#/$defs/genome_qc_options"
+        },
+        {
+            "$ref": "#/$defs/run_level_options"
         },
         {
             "$ref": "#/$defs/reporting_options"

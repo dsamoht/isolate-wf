@@ -13,7 +13,10 @@ report and the pipeline information, which are global.
 - [Reorientation](#reorientation) — Dnaapler
 - [Assembly quality](#assembly-quality) — CheckM2
 - [Mobile genetic elements](#mobile-genetic-elements) — geNomad
+- [Taxonomy](#taxonomy) — GTDB-Tk, with `--run_gtdbtk`
+- [Duplicate isolates](#duplicate-isolates) — skani, with `--run_dedup`
 - [Sample summary](#sample-summary)
+- [Run summary](#run-summary)
 - [MultiQC](#multiqc)
 - [Pipeline information](#pipeline-information)
 
@@ -34,6 +37,8 @@ flowchart TB
   AUTOCYCLER_COMBINE --> DNAAPLER
   AUTOCYCLER_COMBINE --> CHECKM2
   AUTOCYCLER_COMBINE --> GENOMAD
+  DNAAPLER --> GTDBTK_CLASSIFYWF
+  DNAAPLER --> SKANI_TRIANGLE
   LONGREAD_QC --> MULTIQC
   CHECKM2 --> MULTIQC
 ```
@@ -68,6 +73,7 @@ Long reads are trimmed of adapters with Porechop_ABI, then filtered by length
   - `<sample_id>_autocycler_metrics.tsv`: the sample's Autocycler metrics, from `autocycler table`.
 - `sample_<sample_id>/autocycler_clustering/`
   - `clustering.tsv`, `clustering.newick`, `clustering.yaml`: how the input contigs were clustered.
+  - `assembly_filter.tsv`: the contig count of every input assembly and whether it was `kept`, `excluded` as an outlier, or `empty`, with the exclusion limit.
   - `<sample_id>_autocycler_out.tar.gz`: the whole Autocycler directory, as `autocycler_full.sh` would leave it: the input graph (`input_assemblies.gfa`), the `clustering/qc_pass/` and `qc_fail/` cluster directories with their untrimmed, trimmed and resolved graphs (`1_untrimmed.gfa` to `5_final.gfa`), and the consensus. For a sample whose clusters all fail QC, it stops at the untrimmed graphs.
 - `autocycler_metrics.tsv`: the metrics of every sample in one table.
 
@@ -78,6 +84,17 @@ every subset is assembled with every assembler not turned off with `--skip_<asse
 a unitig graph, clusters the contigs into putative replicons, trims and resolves each
 cluster that passes QC, and combines them into the consensus. A sample whose assemblers all
 fail, or whose clusters all fail QC, gets no consensus: the run carries on and logs a warning.
+
+`autocycler compress` stops a sample when its assemblies have more than 25 contigs on average
+(`--max_contigs`). One assembler that keeps hundreds of low-coverage contigs, often metaMDBG,
+Myloasm, Raven or miniasm, can push the average over that limit for an otherwise clean isolate.
+To prevent this, the assemblies with more than five times the median contig count (and more than
+25 contigs) are left out before compressing. Empty assemblies are left out as well, since
+`autocycler compress` stops on an empty file, and they do not count towards the median.
+The sample fails if fewer than half of its non-empty assemblies are left. `assembly_filter.tsv`
+and the summary log list the assemblies that were left out. A sample whose assemblies are almost
+all fragmented, because of low depth or a mixed culture, still fails: no filter can rescue it.
+The thresholds are set in [usage](usage.md#outlier-assemblies).
 
 The metrics tables help judge how much to trust a consensus: `pass_cluster_count` and
 `fail_cluster_count` count the putative replicons kept and dropped, `overall_clustering_score`
@@ -112,7 +129,10 @@ Skipped with `--skip_dnaapler`.
 
 </details>
 
-Skipped with `--skip_checkm2`.
+Skipped with `--skip_checkm2`. An assembly under 90% completeness or over 5% contamination
+(`--checkm2_min_completeness`, `--checkm2_max_contamination`) is flagged with a warning in its
+summary log and in the run summary. High contamination in an isolate often means a mixed
+culture.
 
 ### Mobile genetic elements
 
@@ -129,6 +149,35 @@ Skipped with `--skip_checkm2`.
 </details>
 
 Skipped with `--skip_genomad`, or when no `--genomad_db` is given.
+
+### Taxonomy
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `gtdbtk/gtdbtk_out/`: the GTDB-Tk `classify_wf` output for every sample of the run.
+  - `gtdbtk.bac120.summary.tsv`, `gtdbtk.ar53.summary.tsv`: the classification of each genome, by domain. Each genome is named after its sample.
+
+</details>
+
+Run once, on the final assemblies of every sample (the reoriented ones, unless `--skip_dnaapler`),
+only with `--run_gtdbtk` and `--gtdbtk_db`. The classification of each sample is also in its
+summary log.
+
+### Duplicate isolates
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `dedup/`
+  - `skani_triangle.tsv`: the ANI and aligned fractions of every pair of final assemblies, from `skani triangle -E --slow`.
+  - `duplicate_isolates.tsv`: the pairs with an ANI of at least 99.9% over at least 95% of both assemblies (`--dedup_min_ani`, `--dedup_min_af`), which are likely the same strain.
+
+</details>
+
+Run once on the final assemblies of every sample, only with `--run_dedup`. Two barcodes
+that turn out to be the same strain are flagged with a warning in their summary logs and in
+the run summary.
 
 ### Sample summary
 
@@ -147,6 +196,19 @@ whether they resolved, the gene each circular contig was reoriented to, the Chec
 completeness and contamination, and the plasmids, viruses and proviruses geNomad found. A
 step that was skipped says with which flag; one that was never reached says why. The
 software versions of the run close it.
+
+### Run summary
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `isolate-wf_run_summary.tsv`: one line per sample: `assembled` or `no_assembly`, the result line of its summary log, and its warnings.
+
+</details>
+
+With `--skip_failed_samples` (the default), a sample whose task fails stops there and the
+other samples carry on. Its summary log says which step it stopped at, and the end of the run
+lists the samples without a consensus and the flagged ones.
 
 ### MultiQC
 
