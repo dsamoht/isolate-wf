@@ -61,7 +61,7 @@ nextflow pull dsamoht/isolate-wf
 Specify the pipeline version with `-r`, and record it in your methods:
 
 ```bash
-nextflow run dsamoht/isolate-wf -r 0.1.0 -profile docker --input ./samplesheet.csv --outdir ./results
+nextflow run dsamoht/isolate-wf -r 0.2.0 -profile docker --input ./samplesheet.csv --outdir ./results
 ```
 
 ## Core Nextflow arguments

@@ -15,7 +15,7 @@ Nextflow wrapper for the Autocycler long-read consensus
 genome assembly pipeline
 
      Github: https://github.com/dsamoht/isolate-wf
-     Version: v0.1.0
+     Version: v0.2.0
 ```
 
 ## tl;dr
