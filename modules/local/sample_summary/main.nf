@@ -19,16 +19,21 @@ process SAMPLE_SUMMARY {
         path(nanoplot_qc , stageAs: 'inputs/nanoplot_qc/*'),
         path(subsample   , stageAs: 'inputs/subsample/*'),
         path(assemblies  , stageAs: 'inputs/assemblies/*'),
+        path(compress    , stageAs: 'inputs/compress/*'),
         path(clustering  , stageAs: 'inputs/clustering/*'),
         path(metrics     , stageAs: 'inputs/metrics/*'),
         path(consensus   , stageAs: 'inputs/consensus/*'),
         path(dnaapler    , stageAs: 'inputs/dnaapler/*'),
         path(checkm2     , stageAs: 'inputs/checkm2/*'),
         path(genomad     , stageAs: 'inputs/genomad/*'),
+        path(gtdbtk      , stageAs: 'inputs/gtdbtk/*'),
+        path(dedup       , stageAs: 'inputs/dedup/*'),
         path(versions)
 
     output:
     tuple val(meta), path("isolate-wf_sample_*_summary.log"), emit: log
+    // One line, the sample's result and warnings, for the table of the whole run
+    tuple val(meta), path("*_result.tsv")                   , emit: result
 
     script:
     def prefix = task.ext.prefix ?: "${meta.id}"
@@ -46,6 +51,7 @@ process SAMPLE_SUMMARY {
         --info info.tsv \\
         --versions ${versions} \\
         --inputs inputs \\
-        --output isolate-wf_sample_${prefix}_summary.log
+        --output isolate-wf_sample_${prefix}_summary.log \\
+        --result ${prefix}_result.tsv
     """
 }

@@ -78,6 +78,11 @@ workflow PIPELINE_INITIALISATION {
         error("Every assembler is skipped: leave at least one of ${assemblers.collect { assembler -> "--skip_${assembler}" }.join(', ')} off.")
     }
 
+    // GTDB-Tk has no default reference data to fall back on
+    if (params.run_gtdbtk && !params.gtdbtk_db) {
+        error("--run_gtdbtk needs the GTDB-Tk reference data: pass its directory with --gtdbtk_db.")
+    }
+
     log.info(paramsSummaryLog(workflow))
 
     //

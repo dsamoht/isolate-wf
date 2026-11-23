@@ -1,0 +1,72 @@
+nextflow_process {
+
+    name "Test Process AUTOCYCLER_COMPRESS"
+    script "../main.nf"
+    process "AUTOCYCLER_COMPRESS"
+    tag "modules"
+    tag "autocycler"
+    tag "autocycler/compress"
+
+    // Six assemblies that agree on a chromosome and a plasmid, one that keeps 60 small
+    // contigs, and an empty one: the outlier is left out, the empty one is not counted
+    def writeAssemblies = { File dir ->
+        dir.mkdirs()
+        def rng = new Random(42)
+        def seq = { int n -> (1..n).collect { 'ACGT'[rng.nextInt(4)] }.join() }
+        def chromosome = seq(20000)
+        def plasmid = seq(3000)
+        (1..6).each { i ->
+            new File(dir, "raven_0${i}.fasta").text = ">chromosome circular=true\n${chromosome}\n>plasmid circular=true\n${plasmid}\n"
+        }
+        new File(dir, "metamdbg_01.fasta").text = (1..60).collect { i -> ">contig_${i}\n${seq(1000)}\n" }.join()
+        new File(dir, "plassembler_01.fasta").text = ''
+        return dir
+    }
+
+    test("outlier assembly is excluded") {
+
+        when {
+            def dir = writeAssemblies(new File("${outputDir}/assemblies"))
+            process {
+                """
+                input[0] = [ [ id: 'test' ], files('${dir}/*.fasta') ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def filter = path(process.out.filter[0][1]).readLines()
+            assert filter[0] == "assembly\tcontigs\tlimit\tstatus"
+            // median of 2 contigs over 7 non-empty assemblies: the limit is max(25, 5 x 2)
+            assert filter.contains("metamdbg_01\t60\t25\texcluded")
+            assert filter.contains("plassembler_01\t0\t25\tempty")
+            assert filter.findAll { line -> line.endsWith("\tkept") }.size() == 6
+            assert path("${process.out.graph[0][1]}/input_assemblies.gfa").exists()
+        }
+    }
+
+    test("too few assemblies left fails the task") {
+
+        config "./strict.config"
+
+        when {
+            // Fail the task rather than ignore it, as the default --skip_failed_samples would
+            params {
+                skip_failed_samples = false
+            }
+            def dir = writeAssemblies(new File("${outputDir}/assemblies"))
+            process {
+                """
+                input[0] = [ [ id: 'test' ], files('${dir}/*.fasta') ]
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            // The task stderr is quoted in the error report of Nextflow
+            assert process.stdout.any { line -> line.contains("only 6 of 7 non-empty assemblies left") }
+        }
+    }
+}

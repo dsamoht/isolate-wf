@@ -19,6 +19,8 @@ nextflow_pipeline {
             params {
                 input  = samplesheet.toString()
                 outdir = "$outputDir"
+                // The two test samples are the same strain: skani flags them as duplicates
+                run_dedup = true
             }
         }
 
@@ -33,12 +35,26 @@ nextflow_pipeline {
                 assert path("$outputDir/sample_${sample}/autocycler_final/${sample}_autocycler_metrics.tsv").exists()
                 assert path("$outputDir/sample_${sample}/autocycler_clustering/clustering.tsv").exists()
                 assert path("$outputDir/sample_${sample}/autocycler_clustering/${sample}_autocycler_out.tar.gz").exists()
+                // The outlier filter of AUTOCYCLER_COMPRESS: one line per assembly, under a header
+                def filter = path("$outputDir/sample_${sample}/autocycler_clustering/assembly_filter.tsv").readLines()
+                assert filter[0] == "assembly\tcontigs\tlimit\tstatus"
+                assert filter.size() > 1
+                assert filter.drop(1).every { line -> line.tokenize('\t')[3] in ['kept', 'excluded', 'empty'] }
                 def summary = path("$outputDir/sample_${sample}/isolate-wf_sample_${sample}_summary.log").text
                 assert summary.contains("Result: Consensus assembly")
+                assert summary.contains("Outlier filter: median of")
+                assert summary.contains("WARNING: likely the same strain as ${sample == 'test1' ? 'test2' : 'test1'}")
                 assert summary.contains("Not run: skipped (--skip_checkm2)")
             }
             // A header, then one line per sample
             assert path("$outputDir/autocycler_metrics.tsv").readLines().size() == 3
+            def run_summary = path("$outputDir/isolate-wf_run_summary.tsv").readLines()
+            assert run_summary[0] == "sample\tstatus\tresult\twarnings"
+            assert run_summary.drop(1).collect { line -> line.tokenize('\t')[0..1] } == [['test1', 'assembled'], ['test2', 'assembled']]
+            def duplicates = path("$outputDir/dedup/duplicate_isolates.tsv").readLines()
+            assert duplicates.size() == 2
+            assert duplicates[1].tokenize('\t')[0..1].sort() == ['test1', 'test2']
+            assert path("$outputDir/dedup/skani_triangle.tsv").exists()
             assert path("$outputDir/pipeline_info/isolate-wf_software_mqc_versions.yml").exists()
         }
     }

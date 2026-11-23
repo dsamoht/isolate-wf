@@ -1,0 +1,54 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "gtdbtk_classifywf"
+description: Classify the final assemblies of a run against the GTDB taxonomy
+keywords:
+  - gtdbtk
+  - taxonomy
+  - classification
+tools:
+  - "gtdbtk":
+      description: Toolkit for assigning objective taxonomic classifications to bacterial and archaeal genomes
+      homepage: https://ecogenomics.github.io/GTDBTk/
+      documentation: https://ecogenomics.github.io/GTDBTk/
+      licence: ["GPL-3.0"]
+      identifier: biotools:gtdbtk
+input:
+  - - meta:
+        type: map
+        description: Groovy Map naming the run, e.g. `[ id:'run' ]`
+    - ids:
+        type: list
+        description: Sample ids, in the order of the genomes
+    - genomes:
+        type: file
+        description: Final assemblies in FASTA format, one per sample
+  - gtdbtk_db:
+      type: directory
+      description: The unpacked GTDB-Tk reference data (GTDBTK_DATA_PATH)
+output:
+  results:
+    - - meta:
+          type: map
+          description: Groovy Map naming the run
+      - "gtdbtk_out":
+          type: directory
+          description: The GTDB-Tk output directory
+          pattern: "gtdbtk_out"
+  summary:
+    - - meta:
+          type: map
+          description: Groovy Map naming the run
+      - "gtdbtk.*.summary.tsv":
+          type: file
+          description: Classification of every genome, one table per domain (bac120, ar53)
+          pattern: "gtdbtk.*.summary.tsv"
+  versions:
+    - "versions.yml":
+        type: file
+        description: File containing software versions
+        pattern: "versions.yml"
+authors:
+  - "@dsamoht"
+maintainers:
+  - "@dsamoht"

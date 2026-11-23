@@ -86,17 +86,25 @@ Memory and time requests grow with each retry, and are capped so that no task as
 than a machine has: 256 GB, 32 CPUs and 72 h by default, 249 GB, 64 CPUs and 168 h under `drac`.
 Set `process.resourceLimits` in a config passed with `-c` to match your largest node.
 
+`AUTOCYCLER_GENOME_SIZE` runs Raven on every QC'd read, so its memory request grows with the
+size of the reads: 16 GB per GB of gzipped FASTQ, and 16 GB at least. It is retried once with
+twice the memory after an exit status of 1, which is how Raven reports a task killed for
+lack of memory.
+
 ### `-resume`
 
 Restart a previous run, reusing the tasks whose inputs have not changed.
 
 ## Pipeline specific options
 
-| Option                | Default   | Description                                                                             |
-| --------------------- | --------- | --------------------------------------------------------------------------------------- |
-| `--read_type`         | `ont_r10` | Read type passed to the assemblers: `ont_r9`, `ont_r10`, `pacbio_clr` or `pacbio_hifi`. |
-| `--chopper_minlength` | `1000`    | Minimum read length kept by Chopper.                                                    |
-| `--chopper_minq`      | `10`      | Minimum average read quality kept by Chopper.                                           |
+| Option                        | Default   | Description                                                                                |
+| ----------------------------- | --------- | ------------------------------------------------------------------------------------------ |
+| `--read_type`                 | `ont_r10` | Read type passed to the assemblers: `ont_r9`, `ont_r10`, `pacbio_clr` or `pacbio_hifi`.    |
+| `--chopper_minlength`         | `1000`    | Minimum read length kept by Chopper.                                                       |
+| `--chopper_minq`              | `10`      | Minimum average read quality kept by Chopper.                                              |
+| `--skip_failed_samples`       | `true`    | A failed task stops only its own sample; set `false` to stop the run at the first failure. |
+| `--checkm2_min_completeness`  | `90`      | Flag the assemblies under this CheckM2 completeness (%).                                   |
+| `--checkm2_max_contamination` | `5`       | Flag the assemblies over this CheckM2 contamination (%).                                   |
 
 Each assembler can be turned off: `--skip_flye`, `--skip_plassembler`, `--skip_canu`,
 `--skip_metamdbg`, `--skip_miniasm`, `--skip_myloasm`, `--skip_raven`, `--skip_necat`,
@@ -117,6 +125,14 @@ nextflow run dsamoht/isolate-wf -profile docker --input ./samplesheet.csv --outd
     --genomad_db ./genomad_db
 ```
 
+Two optional steps run once on the final assemblies of every sample:
+
+- `--run_gtdbtk --gtdbtk_db <dir>`: classify them with GTDB-Tk `classify_wf` (version 2.6.1,
+  which needs GTDB release R226). It runs with `--skip_ani_screen`, and asks for 16 CPUs and
+  128 GB: about 45 minutes for 34 genomes.
+- `--run_dedup`: compare every pair with skani and flag the likely duplicate isolates: an ANI
+  of at least `--dedup_min_ani` (99.9) over at least `--dedup_min_af` (95) % of both.
+
 The full, always up-to-date list of parameters is generated from
 [nextflow_schema.json](../nextflow_schema.json):
 
@@ -127,3 +143,23 @@ nextflow run dsamoht/isolate-wf --help --show_hidden  # include hidden parameter
 nextflow run dsamoht/isolate-wf --help read_type      # help for a single parameter
 nextflow run dsamoht/isolate-wf --version             # pipeline version
 ```
+
+### Outlier assemblies
+
+Before compressing, `AUTOCYCLER_COMPRESS` leaves out the assemblies that have far more contigs
+than the others (see [output](output.md#consensus-assembly)). Three `ext` options set its
+thresholds. Set them in a config passed with `-c`:
+
+```groovy
+process {
+    withName: 'AUTOCYCLER_COMPRESS' {
+        ext.outlier_factor    = 5    // exclude above outlier_factor x the median contig count...
+        ext.outlier_min_limit = 25   // ...but never at or below this many contigs
+        ext.min_kept_fraction = 0.5  // fail if fewer of the non-empty assemblies are left
+    }
+}
+```
+
+`outlier_min_limit` defaults to the `--max_contigs` of `autocycler compress`: 25, or the
+value given with `ext.args = '--max_contigs N'`. A very large `outlier_factor` turns the filter
+off.

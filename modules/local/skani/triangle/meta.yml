@@ -1,0 +1,51 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "skani_triangle"
+description: Compare every pair of final assemblies of a run and flag the duplicate isolates
+keywords:
+  - skani
+  - ani
+  - deduplication
+tools:
+  - "skani":
+      description: Fast and robust ANI and aligned fraction for metagenome-assembled and isolate genomes
+      homepage: https://github.com/bluenote-1577/skani
+      documentation: https://github.com/bluenote-1577/skani/wiki
+      licence: ["MIT"]
+      identifier: biotools:skani
+input:
+  - - meta:
+        type: map
+        description: Groovy Map naming the run, e.g. `[ id:'run' ]`
+    - ids:
+        type: list
+        description: Sample ids, in the order of the genomes
+    - genomes:
+        type: file
+        description: Final assemblies in FASTA format, one per sample
+output:
+  ani:
+    - - meta:
+          type: map
+          description: Groovy Map naming the run
+      - "skani_triangle.tsv":
+          type: file
+          description: ANI and aligned fractions of every pair of assemblies, from `skani triangle -E`
+          pattern: "skani_triangle.tsv"
+  duplicates:
+    - - meta:
+          type: map
+          description: Groovy Map naming the run
+      - "duplicate_isolates.tsv":
+          type: file
+          description: The pairs above the ANI and aligned-fraction thresholds, likely the same strain
+          pattern: "duplicate_isolates.tsv"
+  versions:
+    - "versions.yml":
+        type: file
+        description: File containing software versions
+        pattern: "versions.yml"
+authors:
+  - "@dsamoht"
+maintainers:
+  - "@dsamoht"

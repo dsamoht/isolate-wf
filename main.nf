@@ -23,10 +23,12 @@ include { AUTOCYCLER_TRIM_AND_RESOLVE } from './modules/local/autocycler/trim_an
 include { CHECKM2                     } from './modules/local/checkm2'
 include { DNAAPLER                    } from './modules/local/dnaapler'
 include { GENOMAD                     } from './modules/local/genomad'
+include { GTDBTK_CLASSIFYWF           } from './modules/local/gtdbtk/classifywf'
 include { LONGREAD_QC                 } from './workflows/longread_qc'
 include { MULTIQC                     } from './modules/local/multiqc'
 include { PIPELINE_INITIALISATION     } from './subworkflows/local/pipeline_initialisation'
 include { SAMPLE_SUMMARY              } from './modules/local/sample_summary'
+include { SKANI_TRIANGLE              } from './modules/local/skani/triangle'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -54,6 +56,9 @@ params {
     skip_checkm2     : Boolean
     skip_genomad     : Boolean
     skip_multiqc     : Boolean
+    skip_failed_samples : Boolean
+    run_gtdbtk       : Boolean
+    run_dedup        : Boolean
     monochrome_logs  : Boolean
     help_full        : Boolean
     show_hidden      : Boolean
@@ -169,9 +174,11 @@ workflow ISOLATE_WF {
     }
 
     //
-    // MODULE: compress the input assemblies into a unitig graph
+    // MODULE: compress the input assemblies into a unitig graph, after leaving out the
+    // assemblies with far more contigs than the others (see the module)
     //
     ch_compressed = AUTOCYCLER_COMPRESS(ch_all_assemblies.assembled).graph
+    ch_assembly_filter = AUTOCYCLER_COMPRESS.out.filter
     ch_versions = ch_versions.mix(AUTOCYCLER_COMPRESS.out.versions.first())
 
     //
@@ -273,6 +280,41 @@ workflow ISOLATE_WF {
     }
 
     //
+    // Run-level steps, once on the final assemblies of every sample: the reoriented ones
+    // when Dnaapler ran. The genomes are sorted on the sample id, so the task hash, and
+    // with it -resume, depends neither on which sample finished first nor on work directories
+    //
+    ch_run_genomes = (params.skip_dnaapler ? ch_final_assembly : ch_reoriented_assembly)
+        .map { meta, fasta -> [ meta.id.toString(), fasta ] }
+        .toSortedList { a, b -> a[0] <=> b[0] }
+        .filter { genomes -> genomes }
+        .map { genomes -> [ [ id: 'run' ], genomes.collect { genome -> genome[0] }, genomes.collect { genome -> genome[1] } ] }
+
+    //
+    // MODULE: classify the final assemblies against the GTDB taxonomy
+    //
+    ch_gtdbtk_results = channel.empty()
+    ch_gtdbtk_summary = channel.empty()
+    if (params.run_gtdbtk) {
+        GTDBTK_CLASSIFYWF(ch_run_genomes, file(params.gtdbtk_db, checkIfExists: true))
+        ch_gtdbtk_results = GTDBTK_CLASSIFYWF.out.results
+        ch_gtdbtk_summary = GTDBTK_CLASSIFYWF.out.summary
+        ch_versions       = ch_versions.mix(GTDBTK_CLASSIFYWF.out.versions)
+    }
+
+    //
+    // MODULE: compare every pair of final assemblies and flag the duplicate isolates
+    //
+    ch_skani_ani        = channel.empty()
+    ch_dedup_duplicates = channel.empty()
+    if (params.run_dedup) {
+        SKANI_TRIANGLE(ch_run_genomes)
+        ch_skani_ani        = SKANI_TRIANGLE.out.ani
+        ch_dedup_duplicates = SKANI_TRIANGLE.out.duplicates
+        ch_versions         = ch_versions.mix(SKANI_TRIANGLE.out.versions)
+    }
+
+    //
     // Collate software versions
     //
     // Collect the contents rather than the paths: `sort: true` orders the entries by their
@@ -293,8 +335,15 @@ workflow ISOLATE_WF {
     // waits for the end of the run, which is when every log can be complete anyway.
     def summary_steps = [
         'nanoplot_raw', 'porechop', 'chopper', 'nanoplot_qc', 'subsample', 'assemblies',
-        'clustering', 'metrics', 'consensus', 'dnaapler', 'checkm2', 'genomad'
+        'compress', 'clustering', 'metrics', 'consensus', 'dnaapler', 'checkm2', 'genomad',
+        'gtdbtk', 'dedup'
     ]
+
+    // The run-level tables go to the summary of every sample, which picks its own lines
+    ch_sample_ids = ch_raw_long_reads.map { meta, _reads -> meta.id.toString() }
+    ch_run_level_files = ch_gtdbtk_summary
+        .map { _meta, tables -> [ 'gtdbtk', [tables].flatten() ] }
+        .mix(ch_dedup_duplicates.map { _meta, table -> [ 'dedup', [table] ] })
 
     ch_summary_files = channel.empty()
         .mix(
@@ -304,12 +353,14 @@ workflow ISOLATE_WF {
             tagStep(ch_qc_long_reads_out.nanoplot_qc_txt, 'nanoplot_qc'),
             tagStep(ch_subsample_yaml, 'subsample'),
             ch_raw_assemblies.map { meta, fastas -> [ meta.sample.toString(), 'assemblies', fastas ] },
+            tagStep(ch_assembly_filter, 'compress'),
             tagStep(ch_clustered.clustering, 'clustering'),
             tagStep(ch_autocycler_metrics, 'metrics'),
             tagStep(ch_final_assembly, 'consensus'),
             tagStep(ch_dnaapler_summary, 'dnaapler'),
             tagStep(ch_checkm2_report, 'checkm2'),
-            tagStep(ch_genomad_results, 'genomad')
+            tagStep(ch_genomad_results, 'genomad'),
+            ch_sample_ids.combine(ch_run_level_files)
         )
         .groupTuple()
 
@@ -345,13 +396,37 @@ workflow ISOLATE_WF {
                 skip_chopper       : skipFlag(['skip_qc']),
                 skip_dnaapler      : skipFlag(['skip_dnaapler']),
                 skip_checkm2       : skipFlag(['skip_checkm2']),
-                skip_genomad       : params.skip_genomad ? '--skip_genomad' : (params.genomad_db ? '' : 'no --genomad_db given')
+                skip_genomad       : params.skip_genomad ? '--skip_genomad' : (params.genomad_db ? '' : 'no --genomad_db given'),
+                checkm2_min_completeness  : params.checkm2_min_completeness,
+                checkm2_max_contamination : params.checkm2_max_contamination,
+                run_gtdbtk         : params.run_gtdbtk ? 'true' : '',
+                run_dedup          : params.run_dedup ? 'true' : '',
+                dedup_min_ani      : params.dedup_min_ani,
+                dedup_min_af       : params.dedup_min_af
             ]
             [ [ id: id ], info ] + summary_steps.collect { step -> by_step[step] }
         }
         .combine(ch_collated_versions)
 
     ch_summary_log = SAMPLE_SUMMARY(ch_summary_input).log
+
+    // One line per sample for the whole run: its result, and the warnings of its summary log
+    ch_run_summary = SAMPLE_SUMMARY.out.result
+        .map { _meta, tsv -> tsv }
+        .collectFile(name: 'isolate-wf_run_summary.tsv', keepHeader: true, sort: { tsv -> tsv.name })
+
+    // The samples left without a consensus, or flagged, are listed at the end of the run
+    ch_run_summary.subscribe { tsv ->
+        def rows = tsv.readLines().drop(1).collect { line -> line.split('\t', -1) }
+        def failed  = rows.findAll { row -> row[1] != 'assembled' }
+        def flagged = rows.findAll { row -> row[1] == 'assembled' && row[3] }
+        if (failed) {
+            log.warn("${failed.size()} of ${rows.size()} samples got no consensus assembly: ${failed.collect { row -> row[0] }.join(', ')}. See isolate-wf_run_summary.tsv and their summary logs.")
+        }
+        if (flagged) {
+            log.warn("${flagged.size()} assembled samples were flagged: ${flagged.collect { row -> "${row[0]} (${row[3]})" }.join('; ')}")
+        }
+    }
 
     //
     // MODULE: MultiQC
@@ -395,12 +470,17 @@ workflow ISOLATE_WF {
     consensus_graph            = ch_consensus_graph
     autocycler_metrics         = ch_autocycler_metrics
     autocycler_metrics_summary = ch_autocycler_metrics_summary
+    assembly_filter            = ch_assembly_filter
     clustering                 = ch_clustered.clustering
     autocycler_archive         = ch_autocycler_archive
     reoriented_assembly        = ch_reoriented_assembly
     checkm2_report             = ch_checkm2_report
     genomad_results            = ch_genomad_results
     summary_log                = ch_summary_log
+    run_summary                = ch_run_summary
+    gtdbtk_results             = ch_gtdbtk_results
+    skani_ani                  = ch_skani_ani
+    dedup_duplicates           = ch_dedup_duplicates
 }
 
 /*
@@ -440,12 +520,17 @@ workflow {
     consensus_graph            = ISOLATE_WF.out.consensus_graph
     autocycler_metrics         = ISOLATE_WF.out.autocycler_metrics
     autocycler_metrics_summary = ISOLATE_WF.out.autocycler_metrics_summary
+    assembly_filter            = ISOLATE_WF.out.assembly_filter
     clustering                 = ISOLATE_WF.out.clustering
     autocycler_archive         = ISOLATE_WF.out.autocycler_archive
     reoriented_assembly        = ISOLATE_WF.out.reoriented_assembly
     checkm2_report             = ISOLATE_WF.out.checkm2_report
     genomad_results            = ISOLATE_WF.out.genomad_results
     summary_log                = ISOLATE_WF.out.summary_log
+    run_summary                = ISOLATE_WF.out.run_summary
+    gtdbtk_results             = ISOLATE_WF.out.gtdbtk_results
+    skani_ani                  = ISOLATE_WF.out.skani_ani
+    dedup_duplicates           = ISOLATE_WF.out.dedup_duplicates
 }
 
 /*
@@ -479,6 +564,9 @@ output {
     autocycler_metrics_summary {
         path "."
     }
+    assembly_filter {
+        path { meta, _file -> "sample_${meta.id}/autocycler_clustering" }
+    }
     clustering {
         path { meta, _files -> "sample_${meta.id}/autocycler_clustering" }
     }
@@ -498,6 +586,18 @@ output {
     // block (bin/isolate_wf_summary.py)
     summary_log {
         path { meta, _file -> "sample_${meta.id}" }
+    }
+    run_summary {
+        path "."
+    }
+    gtdbtk_results {
+        path "gtdbtk"
+    }
+    skani_ani {
+        path "dedup"
+    }
+    dedup_duplicates {
+        path "dedup"
     }
     multiqc_report {
         path "multiqc"

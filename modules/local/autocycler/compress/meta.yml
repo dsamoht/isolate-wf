@@ -30,6 +30,16 @@ output:
           type: directory
           description: Autocycler directory holding the input assembly graph
           pattern: "autocycler_out"
+  filter:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information, e.g. `[ id:'sample1' ]`
+      - "assembly_filter.tsv":
+          type: file
+          description: |
+            Contig count of every input assembly, the exclusion limit, and whether the
+            assembly was kept, excluded as an outlier, or empty
+          pattern: "assembly_filter.tsv"
   versions:
     - "versions.yml":
         type: file
